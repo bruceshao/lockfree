@@ -54,6 +54,10 @@
 
 ### 3. 使用方式
 
+#### 3.1. 导入模块
+可使用 `go get github.com/bruceshao/lockfree` 获取最新版本
+
+#### 3.2. 代码调用
 为了提升性能，Disruptor支持go版本1.18及以上，以便于支持泛型，Disruptor使用非常简单：
 ```go
 func main() {
