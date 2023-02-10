@@ -59,6 +59,10 @@ func (c *consumer[T]) handle() {
 			b     = false
 		)
 		for {
+			// bugfix 防止关闭时后续操作无法释放
+			if c.closed() {
+				return
+			}
 			if c.abuf.enabled(pos) {
 				// 先获取到值
 				v := c.rbuf.element(pos)
