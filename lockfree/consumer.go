@@ -105,6 +105,8 @@ func (c *consumer[T]) close() error {
 	return fmt.Errorf(CloseErrorFormat, "Consumer")
 }
 
+// closed 判断是否已关闭
+// 将直接判断调整为原子操作，解决data race问题
 func (c *consumer[T]) closed() bool {
-	return c.status == READY
+	return atomic.LoadInt32(&c.status) == READY
 }

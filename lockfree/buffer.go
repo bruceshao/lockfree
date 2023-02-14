@@ -50,6 +50,7 @@ func (r *ringBuffer[T]) cap() uint64 {
 // 其内部buf实际是[]uint8，但由于[]uint8切片在寻址时会进行游标是否越界的判断，造成性能下降，
 // 因此通过使用unsafe.Pointer直接对对应的值进行操作，从而避免越界判断，提升性能
 // 之所以使用uint8是考虑到写并发的行为，防止bit操作导致数据异常（或靠锁解决）
+// 由于存在data race问题，此处以调整为[]uint32，便于进行原子操作
 type available struct {
 	buf    unsafe.Pointer
 	blockC chan struct{}
@@ -57,7 +58,7 @@ type available struct {
 }
 
 func newAvailable(capacity int) *available {
-	p := byteArrayPointer(capacity)
+	p := byteArrayPointerWithUint32(capacity)
 	return &available{
 		buf:    p,
 		blockC: make(chan struct{}, 0),
@@ -65,23 +66,25 @@ func newAvailable(capacity int) *available {
 }
 
 // enable 设置pos位置为可读状态，读线程可读取
+// 将操作由uint8直接赋值调整为uint32的原子操作，解决data race问题
 func (a *available) enable(pos int) {
-	*(*uint8)(unsafe.Pointer(uintptr(a.buf) + uintptr(pos))) = 1
+	atomic.StoreUint32((*uint32)(unsafe.Pointer(uintptr(a.buf)+uintptr(4*pos))), 1)
+}
+
+// enabled 返回pos位置是否可读，true为可读，此时可通过buffer获取对应元素
+// 解决data race
+func (a *available) enabled(pos int) bool {
+	return atomic.LoadUint32((*uint32)(unsafe.Pointer(uintptr(a.buf)+uintptr(4*pos)))) == 1
 }
 
 // disable 设置pos位置为可写状态，写入线程可写入值
 func (a *available) disable(pos int) {
-	*(*uint8)(unsafe.Pointer(uintptr(a.buf) + uintptr(pos))) = 0
-}
-
-// enabled 返回pos位置是否可读，true为可读，此时可通过buffer获取对应元素
-func (a *available) enabled(pos int) bool {
-	return (*(*uint8)(unsafe.Pointer(uintptr(a.buf) + uintptr(pos)))) == 1
+	atomic.StoreUint32((*uint32)(unsafe.Pointer(uintptr(a.buf)+uintptr(4*pos))), 0)
 }
 
 // disabled 返回pos位置是否可写，true为可写，此时写入线程可以写入值至buffer指定位置
 func (a *available) disabled(pos int) bool {
-	return (*(*uint8)(unsafe.Pointer(uintptr(a.buf) + uintptr(pos)))) == 0
+	return atomic.LoadUint32((*uint32)(unsafe.Pointer(uintptr(a.buf)+uintptr(4*pos)))) == 0
 }
 
 // wait 消费端由于长时间未获取到结果，阻塞等待

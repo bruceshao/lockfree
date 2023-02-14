@@ -63,8 +63,9 @@ func (s *sequencer) canWrite(willWrite uint64) bool {
 }
 
 // nextRead 获取下个要读取的位置
+// 使用原子操作解决data race问题
 func (s *sequencer) nextRead() uint64 {
-	return s.rc
+	return atomic.LoadUint64(&s.rc)
 }
 
 // setRead 更新要读取的位置，只会有一个rg来操作

@@ -42,3 +42,16 @@ func TestCh1(t *testing.T) {
 	fmt.Printf("write %v\n", time.Now())
 	time.Sleep(2 * time.Second)
 }
+
+func TestMM(t *testing.T) {
+	var i = 100
+	go func() {
+		for {
+			if i == 0 {
+				panic(100)
+			}
+		}
+	}()
+	i = 0
+	time.Sleep(10 * time.Microsecond)
+}

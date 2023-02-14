@@ -27,8 +27,8 @@ func TestChan1(t *testing.T) {
 
 	var (
 		length   = 1024 * 1024
-		goSize   = 50
-		numPerGo = 10000
+		goSize   = GoSize
+		numPerGo = SchPerGo
 		counter  = uint64(0)
 		slower   = uint64(0)
 		wg       sync.WaitGroup
@@ -44,7 +44,7 @@ func TestChan1(t *testing.T) {
 			if count == 1 {
 				ts = time.Now()
 			}
-			if x%100000 == 0 {
+			if x%1000000 == 0 {
 				fmt.Printf("read %d\n", x)
 			}
 			if count == int32(goSize*numPerGo) {

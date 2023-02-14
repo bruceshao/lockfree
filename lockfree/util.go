@@ -45,6 +45,20 @@ func wait(loop int, waitMax int) (int, bool) {
 // byteArrayPointer 创建uint8切片，返回其对应实际内容（Data）的指针
 func byteArrayPointer(capacity int) unsafe.Pointer {
 	bytes := make([]uint8, capacity)
-	rs := *(*reflect.SliceHeader)(unsafe.Pointer(&bytes))
+	rs := (*reflect.SliceHeader)(unsafe.Pointer(&bytes))
+	return unsafe.Pointer(rs.Data)
+}
+
+// byteArrayPointer 创建uint32切片，返回其对应实际内容（Data）的指针
+func byteArrayPointerWithUint32(capacity int) unsafe.Pointer {
+	bytes := make([]uint32, capacity)
+	rs := (*reflect.SliceHeader)(unsafe.Pointer(&bytes))
+	return unsafe.Pointer(rs.Data)
+}
+
+// byteArrayPointer 创建int64切片，返回其对应实际内容（Data）的指针
+func byteArrayPointerWithInt64(capacity int) unsafe.Pointer {
+	bytes := make([]int64, capacity)
+	rs := (*reflect.SliceHeader)(unsafe.Pointer(&bytes))
 	return unsafe.Pointer(rs.Data)
 }
