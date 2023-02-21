@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unsafe"
 )
 
 const (
@@ -22,19 +23,21 @@ const (
 	SchPerGo = 10000
 )
 
-type longEventHandler[T uint64] struct {
+type longEventHandler struct {
 	count int32
 	ts    time.Time
 }
 
-func (h *longEventHandler[T]) OnEvent(v uint64) {
+func (h *longEventHandler) OnEvent(t interface{}) {
 	atomic.AddInt32(&h.count, 1)
 	if h.count == 1 {
 		h.ts = time.Now()
 	}
-	if v%1000000 == 0 {
-		fmt.Printf("read %d\n", v)
-	}
+	//fmt.Println(t)
+	//v := t.(uint64)
+	//if v%1000000 == 0 {
+	//	fmt.Printf("read %d\n", v)
+	//}
 	if h.count == GoSize*SchPerGo {
 		tl := time.Since(h.ts)
 		fmt.Printf("read time = %d ms\n", tl.Milliseconds())
@@ -52,11 +55,11 @@ func TestAA(t *testing.T) {
 		slower      = uint64(0)
 		counter     = uint64(0)
 	)
-	eh := &longEventHandler[uint64]{}
+	eh := &longEventHandler{}
 	//queue, err := NewProducer[uint64](1024*1024, 1, eh, &SleepWaitStrategy{
 	//	t: time.Nanosecond * 1,
 	//})
-	disruptor := NewSerialDisruptor[uint64](1024*1024, eh, &SchedWaitStrategy{})
+	disruptor := NewSerialDisruptor(1024*1024, eh, &SchedWaitStrategy{})
 	disruptor.Start()
 	producer := disruptor.Producer()
 	var wg sync.WaitGroup
@@ -115,4 +118,12 @@ func TestB(t *testing.T) {
 	typeOf := reflect.TypeOf(x)
 	fmt.Println(typeOf)
 	fmt.Println(os.Getpagesize())
+}
+
+func TestC(t *testing.T) {
+	ex := e{
+		val: uint64(100),
+	}
+	x := unsafe.Sizeof(ex)
+	fmt.Println(x)
 }

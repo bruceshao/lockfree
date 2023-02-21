@@ -47,3 +47,30 @@ func TestX(t *testing.T) {
 	tl := time.Since(ts)
 	fmt.Println(tl.Microseconds())
 }
+
+func TestY(t *testing.T) {
+	bytes := make([]T, 1024)
+	rs := (*reflect.SliceHeader)(unsafe.Pointer(&bytes))
+	p := unsafe.Pointer(rs.Data)
+	zs := T{
+		Name: "zhangsan",
+		age:  100,
+	}
+	//bytes[0] = &zs
+
+	*(*T)(unsafe.Pointer(uintptr(p) + uintptr(0))) = zs
+
+	//atomic.StorePointer(&p, unsafe.Pointer(&zs))
+	fmt.Println(bytes[0])
+}
+
+func load() (unsafe.Pointer, *[]*T) {
+	bytes := make([]*T, 1024)
+	rs := (*reflect.SliceHeader)(unsafe.Pointer(&bytes))
+	return unsafe.Pointer(rs.Data), &bytes
+}
+
+type T struct {
+	Name string
+	age  int
+}

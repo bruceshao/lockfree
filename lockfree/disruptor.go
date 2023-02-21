@@ -13,21 +13,21 @@ import (
 )
 
 // Disruptor 包装类，内部包装了生产者和消费者
-type Disruptor[T any] struct {
-	writer   *Producer[T]
-	consumer *consumer[T]
+type Disruptor struct {
+	writer   *Producer
+	consumer *consumer
 	status   int32
 }
 
 // NewSerialDisruptor 创建串行化消费端的Disruptor
 // 串行化消费端会直接调用EventHandler.OnEvent()方法，需要用户侧手动实现并发处理
-func NewSerialDisruptor[T any](capacity int, handler EventHandler[T], writeWait waitStrategy) *Disruptor[T] {
+func NewSerialDisruptor(capacity int, handler EventHandler, writeWait waitStrategy) *Disruptor {
 	return NewDisruptor(false, capacity, handler, writeWait)
 }
 
 // NewParallelDisruptor 创建并行化消费端的Disruptor
 // 并行化消费端会通过新启动一个goroutine的方式，调用EventHandler.OnEvent()方法，用户侧不再需要并发处理
-func NewParallelDisruptor[T any](capacity int, handler EventHandler[T], writeWait waitStrategy) *Disruptor[T] {
+func NewParallelDisruptor(capacity int, handler EventHandler, writeWait waitStrategy) *Disruptor {
 	return NewDisruptor(true, capacity, handler, writeWait)
 }
 
@@ -36,20 +36,20 @@ func NewParallelDisruptor[T any](capacity int, handler EventHandler[T], writeWai
 // capacity：buffer的容量大小，类似于chan的大小，但要求必须是2^n，即2的指数倍
 // handler：消费端的事件处理器
 // writeWait：写入阻塞时等待策略，建议使用SchedWaitStrategy
-func NewDisruptor[T any](parallel bool, capacity int, handler EventHandler[T], writeWait waitStrategy) *Disruptor[T] {
+func NewDisruptor(parallel bool, capacity int, handler EventHandler, writeWait waitStrategy) *Disruptor {
 	seqer := newSequencer(capacity, writeWait)
 	abuf := newAvailable(capacity)
-	rbuf := newRingBuffer[T](capacity, seqer)
-	cmer := newConsumer[T](parallel, rbuf, abuf, handler)
-	writer := newProducer[T](seqer, abuf, rbuf)
-	return &Disruptor[T]{
+	rbuf := newRingBuffer(capacity, seqer)
+	cmer := newConsumer(parallel, rbuf, abuf, handler)
+	writer := newProducer(seqer, abuf, rbuf)
+	return &Disruptor{
 		writer:   writer,
 		consumer: cmer,
 		status:   READY,
 	}
 }
 
-func (d *Disruptor[T]) Start() error {
+func (d *Disruptor) Start() error {
 	if atomic.CompareAndSwapInt32(&d.status, READY, RUNNING) {
 		// 启动消费者
 		if err := d.consumer.start(); err != nil {
@@ -68,15 +68,15 @@ func (d *Disruptor[T]) Start() error {
 	return fmt.Errorf(StartErrorFormat, "Disruptor")
 }
 
-func (d *Disruptor[T]) Producer() *Producer[T] {
+func (d *Disruptor) Producer() *Producer {
 	return d.writer
 }
 
-func (d *Disruptor[T]) Running() bool {
+func (d *Disruptor) Running() bool {
 	return d.status == RUNNING
 }
 
-func (d *Disruptor[T]) Close() error {
+func (d *Disruptor) Close() error {
 	if atomic.CompareAndSwapInt32(&d.status, RUNNING, READY) {
 		// 关闭生产者
 		if err := d.writer.close(); err != nil {

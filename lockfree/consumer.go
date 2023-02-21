@@ -14,18 +14,18 @@ import (
 
 // consumer 消费者，这个消费者只会有一个g操作，这样处理的好处是可以不涉及并发操作，其内部不会涉及到任何锁
 // 对于实际的并发操作由该g进行分配
-type consumer[T any] struct {
-	rbuf     *ringBuffer[T]
+type consumer struct {
+	rbuf     *ringBuffer
 	abuf     *available
 	seqer    *sequencer
-	hdl      EventHandler[T]
+	hdl      EventHandler
 	parallel bool
 	mask     uint64 // 用于使用&代替%（取余）运算提高性能
 	status   int32  // 运行状态
 }
 
-func newConsumer[T any](parallel bool, rbuf *ringBuffer[T], abuf *available, hdl EventHandler[T]) *consumer[T] {
-	return &consumer[T]{
+func newConsumer(parallel bool, rbuf *ringBuffer, abuf *available, hdl EventHandler) *consumer {
+	return &consumer{
 		rbuf:     rbuf,
 		abuf:     abuf,
 		seqer:    rbuf.sequer,
@@ -36,7 +36,7 @@ func newConsumer[T any](parallel bool, rbuf *ringBuffer[T], abuf *available, hdl
 	}
 }
 
-func (c *consumer[T]) start() error {
+func (c *consumer) start() error {
 	if atomic.CompareAndSwapInt32(&c.status, READY, RUNNING) {
 		go c.handle()
 		return nil
@@ -44,7 +44,7 @@ func (c *consumer[T]) start() error {
 	return fmt.Errorf(StartErrorFormat, "Consumer")
 }
 
-func (c *consumer[T]) handle() {
+func (c *consumer) handle() {
 	for {
 		if c.closed() {
 			return
@@ -96,7 +96,7 @@ func (c *consumer[T]) handle() {
 	}
 }
 
-func (c *consumer[T]) close() error {
+func (c *consumer) close() error {
 	if atomic.CompareAndSwapInt32(&c.status, RUNNING, READY) {
 		// 防止阻塞无法释放
 		c.abuf.release()
@@ -107,6 +107,6 @@ func (c *consumer[T]) close() error {
 
 // closed 判断是否已关闭
 // 将直接判断调整为原子操作，解决data race问题
-func (c *consumer[T]) closed() bool {
+func (c *consumer) closed() bool {
 	return atomic.LoadInt32(&c.status) == READY
 }
