@@ -17,12 +17,12 @@ import (
 type Producer[T any] struct {
 	seqer  *sequencer
 	rbuf   *ringBuffer[T]
-	abuf   *available
+	abuf   availBuffer
 	mask   uint64
 	status int32
 }
 
-func newProducer[T any](seqer *sequencer, abuf *available, rbuf *ringBuffer[T]) *Producer[T] {
+func newProducer[T any](seqer *sequencer, abuf availBuffer, rbuf *ringBuffer[T]) *Producer[T] {
 	return &Producer[T]{
 		seqer:  seqer,
 		rbuf:   rbuf,

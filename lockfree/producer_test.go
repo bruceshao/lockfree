@@ -41,7 +41,31 @@ func (h *longEventHandler[T]) OnEvent(v uint64) {
 	}
 }
 
-func TestAA(t *testing.T) {
+func TestSerialWithArrayBuf(t *testing.T) {
+	eh := &longEventHandler[uint64]{}
+	disruptor := NewDisruptorWithArray[uint64](1024*1024, eh, &SchedWaitStrategy{})
+	Write(disruptor)
+}
+
+func TestSerialWithBitmapBuf(t *testing.T) {
+	eh := &longEventHandler[uint64]{}
+	disruptor := NewDisruptorWithBitmap[uint64](1024*1024, eh, &SchedWaitStrategy{})
+	Write(disruptor)
+}
+
+func TestSerialWithArrayBufNotTime(t *testing.T) {
+	eh := &longEventHandler[uint64]{}
+	disruptor := NewDisruptorWithArray[uint64](1024*1024, eh, &SchedWaitStrategy{})
+	WriteNotTime(disruptor)
+}
+
+func TestSerialWithBitmapBufNotTime(t *testing.T) {
+	eh := &longEventHandler[uint64]{}
+	disruptor := NewDisruptorWithBitmap[uint64](1024*1024, eh, &SchedWaitStrategy{})
+	WriteNotTime(disruptor)
+}
+
+func Write(disruptor *Disruptor[uint64]) {
 	var (
 		t1_10us     = uint64(0) // 1-10微秒
 		t10_100us   = uint64(0) // 10-100微秒
@@ -52,11 +76,6 @@ func TestAA(t *testing.T) {
 		slower      = uint64(0)
 		counter     = uint64(0)
 	)
-	eh := &longEventHandler[uint64]{}
-	//queue, err := NewProducer[uint64](1024*1024, 1, eh, &SleepWaitStrategy{
-	//	t: time.Nanosecond * 1,
-	//})
-	disruptor := NewSerialDisruptor[uint64](1024*1024, eh, &SchedWaitStrategy{})
 	disruptor.Start()
 	producer := disruptor.Producer()
 	var wg sync.WaitGroup
@@ -108,6 +127,35 @@ func TestAA(t *testing.T) {
 	fmt.Printf("[1-10ms][%d] \n", t1_10ms)
 	fmt.Printf("[10-100ms][%d] \n", t10_100ms)
 	fmt.Printf("[>100ms][%d] \n", t100_ms)
+}
+
+func WriteNotTime(disruptor *Disruptor[uint64]) {
+	var (
+		counter = uint64(0)
+	)
+	disruptor.Start()
+	producer := disruptor.Producer()
+	var wg sync.WaitGroup
+	wg.Add(GoSize)
+	totalS := time.Now()
+	for i := 0; i < GoSize; i++ {
+		go func() {
+			for j := 0; j < SchPerGo; j++ {
+				x := atomic.AddUint64(&counter, 1)
+				err := producer.Write(x)
+				if err != nil {
+					panic(err)
+				}
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	totalL := time.Since(totalS)
+	fmt.Printf("write total time = [%d ms]\n", totalL.Milliseconds())
+	fmt.Println("----- write complete -----")
+	time.Sleep(time.Second * 3)
+	disruptor.Close()
 }
 
 func TestB(t *testing.T) {

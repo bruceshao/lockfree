@@ -19,16 +19,16 @@ type Disruptor[T any] struct {
 	status   int32
 }
 
-// NewSerialDisruptor 创建串行化消费端的Disruptor
+// NewDisruptorWithArray 创建串行化消费端的Disruptor
 // 串行化消费端会直接调用EventHandler.OnEvent()方法，需要用户侧手动实现并发处理
-func NewSerialDisruptor[T any](capacity int, handler EventHandler[T], writeWait waitStrategy) *Disruptor[T] {
-	return NewDisruptor(false, capacity, handler, writeWait)
+func NewDisruptorWithArray[T any](capacity int, handler EventHandler[T], writeWait waitStrategy) *Disruptor[T] {
+	return NewDisruptor(capacity, handler, writeWait, ArrayBuf)
 }
 
-// NewParallelDisruptor 创建并行化消费端的Disruptor
-// 并行化消费端会通过新启动一个goroutine的方式，调用EventHandler.OnEvent()方法，用户侧不再需要并发处理
-func NewParallelDisruptor[T any](capacity int, handler EventHandler[T], writeWait waitStrategy) *Disruptor[T] {
-	return NewDisruptor(true, capacity, handler, writeWait)
+// NewDisruptorWithBitmap 创建串行化消费端的Disruptor
+// 串行化消费端会直接调用EventHandler.OnEvent()方法，需要用户侧手动实现并发处理
+func NewDisruptorWithBitmap[T any](capacity int, handler EventHandler[T], writeWait waitStrategy) *Disruptor[T] {
+	return NewDisruptor(capacity, handler, writeWait, BitmapBuf)
 }
 
 // NewDisruptor 自定义创建消费端的Disruptor
@@ -36,11 +36,11 @@ func NewParallelDisruptor[T any](capacity int, handler EventHandler[T], writeWai
 // capacity：buffer的容量大小，类似于chan的大小，但要求必须是2^n，即2的指数倍
 // handler：消费端的事件处理器
 // writeWait：写入阻塞时等待策略，建议使用SchedWaitStrategy
-func NewDisruptor[T any](parallel bool, capacity int, handler EventHandler[T], writeWait waitStrategy) *Disruptor[T] {
+func NewDisruptor[T any](capacity int, handler EventHandler[T], writeWait waitStrategy, bufType AvailBufType) *Disruptor[T] {
 	seqer := newSequencer(capacity, writeWait)
-	abuf := newAvailable(capacity)
+	abuf := newAvailBuf(capacity, bufType)
 	rbuf := newRingBuffer[T](capacity, seqer)
-	cmer := newConsumer[T](parallel, rbuf, abuf, handler)
+	cmer := newConsumer[T](rbuf, abuf, handler)
 	writer := newProducer[T](seqer, abuf, rbuf)
 	return &Disruptor[T]{
 		writer:   writer,

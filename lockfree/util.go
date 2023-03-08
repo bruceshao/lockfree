@@ -18,7 +18,7 @@ const (
 	WriteWaitMax     = 7
 	NextWaitMax      = 7
 	ReadWaitMax      = 7
-	BlockWaitMax     = 128
+	BlockWaitMax     = 256
 	READY            = 0 // 模块的状态之就绪态
 	RUNNING          = 1 // 模块的状态之运行态
 	StartErrorFormat = "start model [%s] error"

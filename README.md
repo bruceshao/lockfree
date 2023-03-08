@@ -49,8 +49,6 @@ lockfree内部几乎所有的操作都是通过**原子变量(atomic)**来操作
 	}
 ```
 
-
-
 ##### 4）Pointer替代切片：
 
 available切片用于标记ringbuffer中元素的可用状态。尽管其是一个[]uint8结构，但实际上当高并发对其进行赋值更新时，由于每次操作在其内部都会进行越界判断（通过汇编代码获得该信息），导致其寻址性能并不高。因此通过对切片结构中的Data进行unsafe.Pointer操作，提高了其可用状态调整的性能。
@@ -142,7 +140,7 @@ func main() {
     // 创建事件处理器
     eh := &longEventHandler[uint64]{}
 	// 创建消费端串行处理的Disruptor
-    disruptor := lockfree.NewSerialDisruptor[uint64](1024*1024, eh, &lockfree.SchedWaitStrategy{})
+    disruptor := lockfree.NewDisruptorWithArray[uint64](1024*1024, eh, &lockfree.SchedWaitStrategy{})
     // 启动Disruptor
 	if err := disruptor.Start(); err != nil {
         panic(err)
