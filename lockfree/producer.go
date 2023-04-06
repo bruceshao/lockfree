@@ -18,15 +18,17 @@ type Producer[T any] struct {
 	seqer  *sequencer
 	rbuf   *ringBuffer[T]
 	abuf   *available
+	blocks blockStrategy
 	mask   uint64
 	status int32
 }
 
-func newProducer[T any](seqer *sequencer, abuf *available, rbuf *ringBuffer[T]) *Producer[T] {
+func newProducer[T any](seqer *sequencer, abuf *available, rbuf *ringBuffer[T], blocks blockStrategy) *Producer[T] {
 	return &Producer[T]{
 		seqer:  seqer,
 		rbuf:   rbuf,
 		abuf:   abuf,
+		blocks: blocks,
 		mask:   uint64(rbuf.capacity) - 1,
 		status: READY,
 	}
@@ -50,21 +52,18 @@ func (q *Producer[T]) Write(v T) error {
 	if q.closed() {
 		return ClosedError
 	}
-	var (
-		loop = 0
-	)
 	seq := q.seqer.next()
 	pos := int(seq & q.mask)
 	for {
 		if q.abuf.disabled(pos) {
 			q.rbuf.write(pos, v)
 			q.abuf.enable(pos)
-			// 如果接收方阻塞则释放
-			q.abuf.release()
+			// 释放，防止消费端阻塞
+			q.blocks.release()
 			break
 		}
 		// 写操作持续等待
-		loop, _ = wait(loop, WriteWaitMax)
+		procyield(30)
 		// 再次判断是否已关闭
 		if q.closed() {
 			return ClosedError

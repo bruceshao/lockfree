@@ -15,10 +15,8 @@ import (
 )
 
 const (
-	WriteWaitMax     = 7
-	NextWaitMax      = 7
-	ReadWaitMax      = 7
-	BlockWaitMax     = 128
+	active_spin      = 4
+	passive_spin     = 1
 	READY            = 0 // 模块的状态之就绪态
 	RUNNING          = 1 // 模块的状态之运行态
 	StartErrorFormat = "start model [%s] error"
@@ -26,21 +24,22 @@ const (
 )
 
 var (
+	ncpu        = runtime.NumCPU()
+	spin        = 0
 	ClosedError = errors.New("the queue has been closed")
 )
 
-// wait 等待，返回是否阻塞
-func wait(loop int, waitMax int) (int, bool) {
-	loop++
-	if loop > waitMax {
-		// 减为原来的一半
-		loop = loop >> 1
-		// 超过次数则阻塞等待调度
-		runtime.Gosched()
-		return loop, true
+func init() {
+	if ncpu > 1 {
+		spin = 4
 	}
-	return loop, false
 }
+
+//go:linkname procyield runtime.procyield
+func procyield(cycles uint32)
+
+//go:linkname osyield runtime.osyield
+func osyield()
 
 // byteArrayPointer 创建uint8切片，返回其对应实际内容（Data）的指针
 func byteArrayPointer(capacity int) unsafe.Pointer {

@@ -12,44 +12,32 @@ import (
 	"sync/atomic"
 )
 
-// Disruptor 包装类，内部包装了生产者和消费者
-type Disruptor[T any] struct {
+// Lockfree 包装类，内部包装了生产者和消费者
+type Lockfree[T any] struct {
 	writer   *Producer[T]
 	consumer *consumer[T]
 	status   int32
 }
 
-// NewSerialDisruptor 创建串行化消费端的Disruptor
-// 串行化消费端会直接调用EventHandler.OnEvent()方法，需要用户侧手动实现并发处理
-func NewSerialDisruptor[T any](capacity int, handler EventHandler[T], writeWait waitStrategy) *Disruptor[T] {
-	return NewDisruptor(false, capacity, handler, writeWait)
-}
-
-// NewParallelDisruptor 创建并行化消费端的Disruptor
-// 并行化消费端会通过新启动一个goroutine的方式，调用EventHandler.OnEvent()方法，用户侧不再需要并发处理
-func NewParallelDisruptor[T any](capacity int, handler EventHandler[T], writeWait waitStrategy) *Disruptor[T] {
-	return NewDisruptor(true, capacity, handler, writeWait)
-}
-
-// NewDisruptor 自定义创建消费端的Disruptor
+// NewLockfree 自定义创建消费端的Disruptor
 // parallel：表示是否并行化处理
 // capacity：buffer的容量大小，类似于chan的大小，但要求必须是2^n，即2的指数倍
 // handler：消费端的事件处理器
 // writeWait：写入阻塞时等待策略，建议使用SchedWaitStrategy
-func NewDisruptor[T any](parallel bool, capacity int, handler EventHandler[T], writeWait waitStrategy) *Disruptor[T] {
-	seqer := newSequencer(capacity, writeWait)
+func NewLockfree[T any](capacity int, handler EventHandler[T], blocks blockStrategy) *Lockfree[T] {
+	seqer := newSequencer(capacity)
 	abuf := newAvailable(capacity)
 	rbuf := newRingBuffer[T](capacity, seqer)
-	cmer := newConsumer[T](parallel, rbuf, abuf, handler)
-	writer := newProducer[T](seqer, abuf, rbuf)
-	return &Disruptor[T]{
+	cmer := newConsumer[T](rbuf, abuf, handler, blocks)
+	writer := newProducer[T](seqer, abuf, rbuf, blocks)
+	return &Lockfree[T]{
 		writer:   writer,
 		consumer: cmer,
 		status:   READY,
 	}
 }
 
-func (d *Disruptor[T]) Start() error {
+func (d *Lockfree[T]) Start() error {
 	if atomic.CompareAndSwapInt32(&d.status, READY, RUNNING) {
 		// 启动消费者
 		if err := d.consumer.start(); err != nil {
@@ -68,15 +56,15 @@ func (d *Disruptor[T]) Start() error {
 	return fmt.Errorf(StartErrorFormat, "Disruptor")
 }
 
-func (d *Disruptor[T]) Producer() *Producer[T] {
+func (d *Lockfree[T]) Producer() *Producer[T] {
 	return d.writer
 }
 
-func (d *Disruptor[T]) Running() bool {
+func (d *Lockfree[T]) Running() bool {
 	return d.status == RUNNING
 }
 
-func (d *Disruptor[T]) Close() error {
+func (d *Lockfree[T]) Close() error {
 	if atomic.CompareAndSwapInt32(&d.status, RUNNING, READY) {
 		// 关闭生产者
 		if err := d.writer.close(); err != nil {

@@ -9,30 +9,31 @@ package lockfree
 
 import (
 	"fmt"
+	"runtime"
 	"sync/atomic"
 )
 
 // consumer 消费者，这个消费者只会有一个g操作，这样处理的好处是可以不涉及并发操作，其内部不会涉及到任何锁
 // 对于实际的并发操作由该g进行分配
 type consumer[T any] struct {
-	rbuf     *ringBuffer[T]
-	abuf     *available
-	seqer    *sequencer
-	hdl      EventHandler[T]
-	parallel bool
-	mask     uint64 // 用于使用&代替%（取余）运算提高性能
-	status   int32  // 运行状态
+	status int32 // 运行状态
+	rbuf   *ringBuffer[T]
+	abuf   *available
+	seqer  *sequencer
+	blocks blockStrategy
+	hdl    EventHandler[T]
+	mask   uint64 // 用于使用&代替%（取余）运算提高性能
 }
 
-func newConsumer[T any](parallel bool, rbuf *ringBuffer[T], abuf *available, hdl EventHandler[T]) *consumer[T] {
+func newConsumer[T any](rbuf *ringBuffer[T], abuf *available, hdl EventHandler[T], blocks blockStrategy) *consumer[T] {
 	return &consumer[T]{
-		rbuf:     rbuf,
-		abuf:     abuf,
-		seqer:    rbuf.sequer,
-		hdl:      hdl,
-		parallel: parallel,
-		mask:     rbuf.capacity - 1,
-		status:   READY,
+		rbuf:   rbuf,
+		abuf:   abuf,
+		seqer:  rbuf.sequer,
+		hdl:    hdl,
+		blocks: blocks,
+		mask:   rbuf.capacity - 1,
+		status: READY,
 	}
 }
 
@@ -45,53 +46,40 @@ func (c *consumer[T]) start() error {
 }
 
 func (c *consumer[T]) handle() {
+	// 判断是否可以获取到
+	readSeq := c.seqer.nextRead()
 	for {
 		if c.closed() {
 			return
 		}
 		// 获取需要获取的位置
-		readSeq := c.seqer.nextRead()
 		pos := int(readSeq & c.mask)
-		// 判断是否可以获取到
-		var (
-			l     = 0
-			count = 0
-			b     = false
-		)
+		var i = 0
 		for {
-			// bugfix 防止关闭时后续操作无法释放
 			if c.closed() {
 				return
 			}
 			if c.abuf.enabled(pos) {
 				// 先获取到值
 				v := c.rbuf.element(pos)
-				// 设置read自增
-				if c.seqer.setRead(readSeq, readSeq+1) {
-					// 设置不可用
-					c.abuf.disable(pos)
-					// 交由协程队列来处理
-					if c.parallel {
-						go c.hdl.OnEvent(v)
-					} else {
-						c.hdl.OnEvent(v)
-					}
-					break
-				}
+				// 设置read自增，并更新返回值
+				readSeq = c.seqer.readIncrement()
+				// 设置不可用
+				c.abuf.disable(pos)
+				// 交由协程队列来处理
+				c.hdl.OnEvent(v)
+				i = 0
+				break
 			}
-			// 未读取到值
-			if l, b = wait(l, ReadWaitMax); b {
-				count++
+			if i < spin {
+				procyield(30)
+			} else if i < spin+passive_spin {
+				runtime.Gosched()
+			} else {
+				c.blocks.block()
+				i = 0
 			}
-			if count > BlockWaitMax {
-				if !c.abuf.wait() {
-					// 阻塞未成功的情况下，重置计数器
-					// 阻塞成功的话，上一行代码会处理阻塞状态
-					count = 0
-					l = 0
-					continue
-				}
-			}
+			i++
 		}
 	}
 }
@@ -99,7 +87,7 @@ func (c *consumer[T]) handle() {
 func (c *consumer[T]) close() error {
 	if atomic.CompareAndSwapInt32(&c.status, RUNNING, READY) {
 		// 防止阻塞无法释放
-		c.abuf.release()
+		c.blocks.release()
 		return nil
 	}
 	return fmt.Errorf(CloseErrorFormat, "Consumer")

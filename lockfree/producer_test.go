@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unsafe"
 )
 
 const (
@@ -32,9 +33,9 @@ func (h *longEventHandler[T]) OnEvent(v uint64) {
 	if h.count == 1 {
 		h.ts = time.Now()
 	}
-	if v%1000000 == 0 {
-		fmt.Printf("read %d\n", v)
-	}
+	//if v%1000000 == 0 {
+	//	fmt.Printf("read %d\n", v)
+	//}
 	if h.count == GoSize*SchPerGo {
 		tl := time.Since(h.ts)
 		fmt.Printf("read time = %d ms\n", tl.Milliseconds())
@@ -56,7 +57,9 @@ func TestAA(t *testing.T) {
 	//queue, err := NewProducer[uint64](1024*1024, 1, eh, &SleepWaitStrategy{
 	//	t: time.Nanosecond * 1,
 	//})
-	disruptor := NewSerialDisruptor[uint64](1024*1024, eh, &SchedWaitStrategy{})
+	disruptor := NewLockfree[uint64](1024*1024*128, eh, &SleepBlockStrategy{
+		t: time.Microsecond,
+	})
 	disruptor.Start()
 	producer := disruptor.Producer()
 	var wg sync.WaitGroup
@@ -115,4 +118,9 @@ func TestB(t *testing.T) {
 	typeOf := reflect.TypeOf(x)
 	fmt.Println(typeOf)
 	fmt.Println(os.Getpagesize())
+}
+
+func TestC(t *testing.T) {
+	x := 128 - unsafe.Sizeof(uint64(0))%128
+	fmt.Println(x)
 }

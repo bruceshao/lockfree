@@ -15,6 +15,48 @@ import (
 	"time"
 )
 
+func BenchmarkChan(b *testing.B) {
+	var (
+		length   = 1024 * 1024
+		goSize   = GoSize
+		numPerGo = SchPerGo
+		counter  = uint64(0)
+		wg       sync.WaitGroup
+	)
+	ch := make(chan uint64, length)
+	// 消费端
+	go func() {
+		var ts time.Time
+		var count int32
+		for {
+			<-ch
+			atomic.AddInt32(&count, 1)
+			if count == 1 {
+				ts = time.Now()
+			}
+			//if x%10000000 == 0 {
+			//	fmt.Printf("read %d\n", x)
+			//}
+			if count == int32(goSize*numPerGo) {
+				tl := time.Since(ts)
+				fmt.Printf("read time = %d ms\n", tl.Milliseconds())
+			}
+		}
+	}()
+	wg.Add(b.N)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		go func() {
+			for j := 0; j < numPerGo; j++ {
+				x := atomic.AddUint64(&counter, 1)
+				ch <- x
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+}
+
 func TestChan1(t *testing.T) {
 	var (
 		t1_10us     = uint64(0) // 1-10微秒
