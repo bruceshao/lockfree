@@ -17,17 +17,17 @@ import (
 type Producer[T any] struct {
 	seqer  *sequencer
 	rbuf   *ringBuffer[T]
-	abuf   *available
+	sd     stateDescriptor
 	blocks blockStrategy
 	mask   uint64
 	status int32
 }
 
-func newProducer[T any](seqer *sequencer, abuf *available, rbuf *ringBuffer[T], blocks blockStrategy) *Producer[T] {
+func newProducer[T any](seqer *sequencer, sd stateDescriptor, rbuf *ringBuffer[T], blocks blockStrategy) *Producer[T] {
 	return &Producer[T]{
 		seqer:  seqer,
 		rbuf:   rbuf,
-		abuf:   abuf,
+		sd:     sd,
 		blocks: blocks,
 		mask:   uint64(rbuf.capacity) - 1,
 		status: READY,
@@ -55,9 +55,9 @@ func (q *Producer[T]) Write(v T) error {
 	seq := q.seqer.next()
 	pos := int(seq & q.mask)
 	for {
-		if q.abuf.disabled(pos) {
+		if q.sd.disabled(pos) {
 			q.rbuf.write(pos, v)
-			q.abuf.enable(pos)
+			q.sd.enable(pos)
 			// 释放，防止消费端阻塞
 			q.blocks.release()
 			break

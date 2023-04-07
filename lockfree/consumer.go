@@ -18,17 +18,17 @@ import (
 type consumer[T any] struct {
 	status int32 // 运行状态
 	rbuf   *ringBuffer[T]
-	abuf   *available
+	sd     stateDescriptor
 	seqer  *sequencer
 	blocks blockStrategy
 	hdl    EventHandler[T]
 	mask   uint64 // 用于使用&代替%（取余）运算提高性能
 }
 
-func newConsumer[T any](rbuf *ringBuffer[T], abuf *available, hdl EventHandler[T], blocks blockStrategy) *consumer[T] {
+func newConsumer[T any](rbuf *ringBuffer[T], sd stateDescriptor, hdl EventHandler[T], blocks blockStrategy) *consumer[T] {
 	return &consumer[T]{
 		rbuf:   rbuf,
-		abuf:   abuf,
+		sd:     sd,
 		seqer:  rbuf.sequer,
 		hdl:    hdl,
 		blocks: blocks,
@@ -59,13 +59,13 @@ func (c *consumer[T]) handle() {
 			if c.closed() {
 				return
 			}
-			if c.abuf.enabled(pos) {
+			if c.sd.enabled(pos) {
 				// 先获取到值
 				v := c.rbuf.element(pos)
 				// 设置read自增，并更新返回值
 				readSeq = c.seqer.readIncrement()
 				// 设置不可用
-				c.abuf.disable(pos)
+				c.sd.disable(pos)
 				// 交由协程队列来处理
 				c.hdl.OnEvent(v)
 				i = 0

@@ -31,7 +31,7 @@ var (
 
 func init() {
 	if ncpu > 1 {
-		spin = 4
+		spin = active_spin
 	}
 }
 
@@ -41,8 +41,8 @@ func procyield(cycles uint32)
 //go:linkname osyield runtime.osyield
 func osyield()
 
-// byteArrayPointer 创建uint8切片，返回其对应实际内容（Data）的指针
-func byteArrayPointer(capacity int) unsafe.Pointer {
+// byteArrayPointerWithUint8 创建uint8切片，返回其对应实际内容（Data）的指针
+func byteArrayPointerWithUint8(capacity int) unsafe.Pointer {
 	bytes := make([]uint8, capacity)
 	rs := (*reflect.SliceHeader)(unsafe.Pointer(&bytes))
 	return unsafe.Pointer(rs.Data)

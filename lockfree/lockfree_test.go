@@ -19,7 +19,7 @@ func BenchmarkLockFree(b *testing.B) {
 		counter = uint64(0)
 	)
 	eh := &longEventHandler[uint64]{}
-	disruptor := NewLockfree[uint64](1024*1024, eh, &SleepBlockStrategy{
+	disruptor := NewLockfree[uint64](1024*1024, Uint32Array, eh, &SleepBlockStrategy{
 		t: time.Microsecond,
 	})
 	disruptor.Start()

@@ -1,4 +1,4 @@
-package lockfree_test
+package lockfree
 
 import (
 	"runtime"

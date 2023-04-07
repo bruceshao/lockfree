@@ -24,12 +24,12 @@ type Lockfree[T any] struct {
 // capacity：buffer的容量大小，类似于chan的大小，但要求必须是2^n，即2的指数倍
 // handler：消费端的事件处理器
 // writeWait：写入阻塞时等待策略，建议使用SchedWaitStrategy
-func NewLockfree[T any](capacity int, handler EventHandler[T], blocks blockStrategy) *Lockfree[T] {
+func NewLockfree[T any](capacity int, sdr SdrType, handler EventHandler[T], blocks blockStrategy) *Lockfree[T] {
 	seqer := newSequencer(capacity)
-	abuf := newAvailable(capacity)
+	sd := NewStateDescriptor(capacity, sdr)
 	rbuf := newRingBuffer[T](capacity, seqer)
-	cmer := newConsumer[T](rbuf, abuf, handler, blocks)
-	writer := newProducer[T](seqer, abuf, rbuf, blocks)
+	cmer := newConsumer[T](rbuf, sd, handler, blocks)
+	writer := newProducer[T](seqer, sd, rbuf, blocks)
 	return &Lockfree[T]{
 		writer:   writer,
 		consumer: cmer,

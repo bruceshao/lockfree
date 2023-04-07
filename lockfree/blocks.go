@@ -26,11 +26,11 @@ type blockStrategy interface {
 type SchedBlockStrategy struct {
 }
 
-func (w *SchedBlockStrategy) block() {
+func (s *SchedBlockStrategy) block() {
 	runtime.Gosched()
 }
 
-func (w *SchedBlockStrategy) release() {
+func (s *SchedBlockStrategy) release() {
 }
 
 // SleepBlockStrategy 休眠等待策略
@@ -45,14 +45,14 @@ func NewSleepBlockStrategy(wait time.Duration) *SleepBlockStrategy {
 	}
 }
 
-func (w *SleepBlockStrategy) block() {
-	time.Sleep(w.t)
+func (s *SleepBlockStrategy) block() {
+	time.Sleep(s.t)
 }
 
-func (w *SleepBlockStrategy) release() {
+func (s *SleepBlockStrategy) release() {
 }
 
-// ProcYieldBlockStrategy 调度策略
+// ProcYieldBlockStrategy CPU空指令策略
 type ProcYieldBlockStrategy struct {
 	cycle uint32
 }
@@ -63,14 +63,14 @@ func NewProcYieldBlockStrategy(cycle uint32) *ProcYieldBlockStrategy {
 	}
 }
 
-func (w *ProcYieldBlockStrategy) block() {
-	procyield(w.cycle)
+func (s *ProcYieldBlockStrategy) block() {
+	procyield(s.cycle)
 }
 
-func (w *ProcYieldBlockStrategy) release() {
+func (s *ProcYieldBlockStrategy) release() {
 }
 
-// OSYieldBlockStrategy 调度策略
+// OSYieldBlockStrategy 操作系统调度策略
 type OSYieldBlockStrategy struct {
 }
 
@@ -78,9 +78,24 @@ func NewOSYieldWaitStrategy() *OSYieldBlockStrategy {
 	return &OSYieldBlockStrategy{}
 }
 
-func (w *OSYieldBlockStrategy) block() {
+func (s *OSYieldBlockStrategy) block() {
 	osyield()
 }
 
-func (w *OSYieldBlockStrategy) release() {
+func (s *OSYieldBlockStrategy) release() {
+}
+
+// ChanBlockStrategy chan阻塞策略
+type ChanBlockStrategy struct {
+}
+
+func NewChanBlockStrategy() *ChanBlockStrategy {
+	return &ChanBlockStrategy{}
+}
+
+func (s *ChanBlockStrategy) block() {
+	osyield()
+}
+
+func (s *ChanBlockStrategy) release() {
 }
