@@ -26,7 +26,7 @@ func main() {
 	eh := &longEventHandler[uint64]{}
 	// 创建消费端串行处理的Lockfree
 	lf := lockfree.NewLockfree[uint64](1024*1024, lockfree.Uint8Array, eh,
-		lockfree.NewSleepBlockStrategy(time.Microsecond))
+		lockfree.NewChanBlockStrategy())
 	// 启动Lockfree
 	if err := lf.Start(); err != nil {
 		panic(err)

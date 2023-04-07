@@ -9,6 +9,7 @@ package lockfree
 
 import (
 	"runtime"
+	"sync/atomic"
 	"time"
 )
 
@@ -87,15 +88,30 @@ func (s *OSYieldBlockStrategy) release() {
 
 // ChanBlockStrategy chan阻塞策略
 type ChanBlockStrategy struct {
+	bc chan struct{}
+	b  uint32
 }
 
 func NewChanBlockStrategy() *ChanBlockStrategy {
-	return &ChanBlockStrategy{}
+	return &ChanBlockStrategy{
+		bc: make(chan struct{}),
+	}
 }
 
 func (s *ChanBlockStrategy) block() {
-	osyield()
+	// 0：未阻塞；1：阻塞
+	if !atomic.CompareAndSwapUint32(&s.b, 0, 1) {
+		return
+	}
+	// 等待信号
+	<-s.bc
 }
 
 func (s *ChanBlockStrategy) release() {
+	if atomic.CompareAndSwapUint32(&s.b, 1, 0) {
+		// 表示可以释放，即chan是等待状态
+		s.bc <- struct{}{}
+	}
+	// 无法设置则不用关心
+	return
 }
