@@ -80,5 +80,5 @@ func (q *Producer[T]) close() error {
 }
 
 func (q *Producer[T]) closed() bool {
-	return q.status == READY
+	return atomic.LoadInt32(&q.status) == READY
 }
