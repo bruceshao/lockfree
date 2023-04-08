@@ -9,9 +9,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/bruceshao/lockfree/lockfree"
 	"sync"
 	"time"
+
+	"github.com/bruceshao/lockfree/lockfree"
 )
 
 var (
@@ -20,19 +21,25 @@ var (
 )
 
 func main() {
-	// lockfree计时
+	// lockfree 计时
 	t := time.Now()
+
 	// 创建事件处理器
 	eh := &longEventHandler[uint64]{}
-	// 创建消费端串行处理的Lockfree
+
+	// 创建消费端串行处理的 Lockfree
 	lf := lockfree.NewLockfree[uint64](1024*1024, lockfree.Uint8Array, eh,
 		lockfree.NewChanBlockStrategy())
-	// 启动Lockfree
+
+	// 启动 Lockfree
 	if err := lf.Start(); err != nil {
 		panic(err)
 	}
+
 	// 获取生产者对象
 	producer := lf.Producer()
+
+	// 并发开协程写数据
 	var wg sync.WaitGroup
 	wg.Add(goSize)
 	for i := 0; i < goSize; i++ {
@@ -48,10 +55,12 @@ func main() {
 		}(i)
 	}
 	wg.Wait()
+
 	fmt.Println("=====lockfree[", time.Now().Sub(t), "]=====")
 	fmt.Println("----- lockfree write complete -----")
 	time.Sleep(1 * time.Second)
-	// 关闭Lockfree
+
+	// 关闭 Lockfree
 	lf.Close()
 }
 

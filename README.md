@@ -159,13 +159,18 @@ RingBuffer的容量为2的n次方，通过与运算来代替取余运算，提�
 可使用 `go get github.com/bruceshao/lockfree` 获取最新版本
 
 #### 3.2. 代码调用
+
 为了提升性能，Lockfree支持go版本1.18及以上，以便于支持泛型，Lockfree使用非常简单：
+
 ```go
+package main
+
 import (
 	"fmt"
-	"github.com/bruceshao/lockfree/lockfree"
 	"sync"
 	"time"
+
+	"github.com/bruceshao/lockfree/lockfree"
 )
 
 var (
@@ -174,26 +179,32 @@ var (
 )
 
 func main() {
-	// lockfree计时 
+	// lockfree 计时
 	t := time.Now()
-    // 创建事件处理器
-    eh := &longEventHandler[uint64]{}
-    // 创建消费端串行处理的Lockfree
-    lf := lockfree.NewLockfree[uint64](1024*1024, lockfree.Uint8Array, eh,
-		lockfree.NewSleepBlockStrategy(time.Microsecond))
-    // 启动Lockfree
-    if err := lf.Start(); err != nil {
+
+	// 创建事件处理器
+	eh := &longEventHandler[uint64]{}
+
+	// 创建消费端串行处理的 Lockfree
+	lf := lockfree.NewLockfree[uint64](1024*1024, lockfree.Uint8Array, eh,
+		lockfree.NewChanBlockStrategy())
+
+	// 启动 Lockfree
+	if err := lf.Start(); err != nil {
 		panic(err)
 	}
-    // 获取生产者对象
-    producer := lf.Producer()
-    var wg sync.WaitGroup
-    wg.Add(goSize)
-    for i := 0; i < goSize; i++ {
-        go func(start int) {
+
+	// 获取生产者对象
+	producer := lf.Producer()
+
+	// 并发开协程写数据
+	var wg sync.WaitGroup
+	wg.Add(goSize)
+	for i := 0; i < goSize; i++ {
+		go func(start int) {
 			for j := 0; j < sizePerGo; j++ {
-                //写入数据
-                err := producer.Write(uint64(start*sizePerGo + j + 1))
+				//写入数据
+				err := producer.Write(uint64(start*sizePerGo + j + 1))
 				if err != nil {
 					panic(err)
 				}
@@ -202,11 +213,13 @@ func main() {
 		}(i)
 	}
 	wg.Wait()
-    fmt.Println("=====lockfree[", time.Now().Sub(t), "]=====")
-    fmt.Println("----- lockfree write complete -----")
-    time.Sleep(1 * time.Second)
-    // 关闭Lockfree
-    lf.Close()
+
+	fmt.Println("=====lockfree[", time.Now().Sub(t), "]=====")
+	fmt.Println("----- lockfree write complete -----")
+	time.Sleep(1 * time.Second)
+
+	// 关闭 Lockfree
+	lf.Close()
 }
 
 type longEventHandler[T uint64] struct {
@@ -217,7 +230,6 @@ func (h *longEventHandler[T]) OnEvent(v uint64) {
 		fmt.Println("lockfree [", v, "]")
 	}
 }
-
 ```
 
 ### 4. 性能对比
