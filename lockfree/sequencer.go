@@ -36,7 +36,7 @@ func (s *sequencer) next() uint64 {
 	for i := 0; ; i++ {
 		// 获取已读的位置
 		r := atomic.LoadUint64(&s.rc)
-		if next < r+s.capacity {
+		if next <= r+s.capacity {
 			// 可以写入数据
 			return next
 		}

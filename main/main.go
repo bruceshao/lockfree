@@ -10,6 +10,8 @@ package main
 import (
 	"fmt"
 	"github.com/bruceshao/lockfree/lockfree"
+	"os"
+	"runtime/pprof"
 	"sync"
 	"time"
 )
@@ -20,13 +22,18 @@ var (
 )
 
 func main() {
+	//runtime.GOMAXPROCS(10)
+	f, _ := os.OpenFile("cpu.pprof", os.O_CREATE|os.O_RDWR, 0644)
+	defer f.Close()
+	pprof.StartCPUProfile(f)
+	defer pprof.StopCPUProfile()
 	// lockfree计时
 	t := time.Now()
 	// 创建事件处理器
 	eh := &longEventHandler[uint64]{}
 	// 创建消费端串行处理的Lockfree
-	lf := lockfree.NewLockfree[uint64](1024*1024, lockfree.Uint8Array, eh,
-		lockfree.NewChanBlockStrategy())
+	lf := lockfree.NewLockfree[uint64](1024*1024, lockfree.Array, eh,
+		lockfree.NewSleepBlockStrategy(time.Microsecond))
 	// 启动Lockfree
 	if err := lf.Start(); err != nil {
 		panic(err)

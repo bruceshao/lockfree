@@ -19,6 +19,7 @@ const (
 	Uint32Array = SdrType(0)
 	Uint8Array  = SdrType(1)
 	Bitmap      = SdrType(2)
+	Array       = SdrType(3)
 )
 
 // stateDescriptor 状态描述符
@@ -40,8 +41,42 @@ func NewStateDescriptor(capacity int, sdrType SdrType) stateDescriptor {
 		return newAvailableWithUint8(capacity)
 	} else if sdrType == Bitmap {
 		return newAvailableWithBitmap(capacity)
+	} else if sdrType == Array {
+		return newAvailableWithUint32Array(capacity)
 	}
 	return nil
+}
+
+type availableWithUint32Array struct {
+	buf []uint32
+}
+
+func newAvailableWithUint32Array(capacity int) *availableWithUint32Array {
+	return &availableWithUint32Array{
+		buf: make([]uint32, capacity),
+	}
+}
+
+// enable 设置pos位置为可读状态，读线程可读取
+// 将操作由uint8直接赋值调整为uint32的原子操作，解决data race问题
+func (a *availableWithUint32Array) enable(pos int) {
+	a.buf[pos] = 1
+}
+
+// enabled 返回pos位置是否可读，true为可读，此时可通过buffer获取对应元素
+// 解决data race
+func (a *availableWithUint32Array) enabled(pos int) bool {
+	return a.buf[pos] == 1
+}
+
+// disable 设置pos位置为可写状态，写入线程可写入值
+func (a *availableWithUint32Array) disable(pos int) {
+	a.buf[pos] = 0
+}
+
+// disabled 返回pos位置是否可写，true为可写，此时写入线程可以写入值至buffer指定位置
+func (a *availableWithUint32Array) disabled(pos int) bool {
+	return a.buf[pos] == 0
 }
 
 // availableWithUint32 切片实现的map，通过index（或pos）标识每个位置为0或1
