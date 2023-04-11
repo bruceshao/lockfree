@@ -15,16 +15,16 @@ import (
 
 // consumer 消费者，这个消费者只会有一个g操作，这样处理的好处是可以不涉及并发操作，其内部不会涉及到任何锁
 // 对于实际的并发操作由该g进行分配
-type consumer[T any] struct {
+type consumer struct {
 	status int32 // 运行状态
-	rbuf   *ringBuffer[T]
+	rbuf   *ringBuffer
 	seqer  *sequencer
 	blocks blockStrategy
-	hdl    EventHandler[T]
+	hdl    EventHandler
 }
 
-func newConsumer[T any](rbuf *ringBuffer[T], hdl EventHandler[T], sequer *sequencer, blocks blockStrategy) *consumer[T] {
-	return &consumer[T]{
+func newConsumer(rbuf *ringBuffer, hdl EventHandler, sequer *sequencer, blocks blockStrategy) *consumer {
+	return &consumer{
 		rbuf:   rbuf,
 		seqer:  sequer,
 		hdl:    hdl,
@@ -33,7 +33,7 @@ func newConsumer[T any](rbuf *ringBuffer[T], hdl EventHandler[T], sequer *sequen
 	}
 }
 
-func (c *consumer[T]) start() error {
+func (c *consumer) start() error {
 	if atomic.CompareAndSwapInt32(&c.status, READY, RUNNING) {
 		go c.handle()
 		return nil
@@ -41,7 +41,7 @@ func (c *consumer[T]) start() error {
 	return fmt.Errorf(StartErrorFormat, "Consumer")
 }
 
-func (c *consumer[T]) handle() {
+func (c *consumer) handle() {
 	// 判断是否可以获取到
 	rc := c.seqer.nextRead()
 	for {
@@ -73,7 +73,7 @@ func (c *consumer[T]) handle() {
 	}
 }
 
-func (c *consumer[T]) close() error {
+func (c *consumer) close() error {
 	if atomic.CompareAndSwapInt32(&c.status, RUNNING, READY) {
 		// 防止阻塞无法释放
 		c.blocks.release()
@@ -84,6 +84,6 @@ func (c *consumer[T]) close() error {
 
 // closed 判断是否已关闭
 // 将直接判断调整为原子操作，解决data race问题
-func (c *consumer[T]) closed() bool {
+func (c *consumer) closed() bool {
 	return atomic.LoadInt32(&c.status) == READY
 }

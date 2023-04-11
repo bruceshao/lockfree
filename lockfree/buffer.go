@@ -9,39 +9,39 @@ package lockfree
 
 import "sync/atomic"
 
-type e[T any] struct {
+type e struct {
 	c   uint64
-	val T
+	val interface{}
 }
 
 // ringBuffer 具体对象的存放区域，通过数组（定长切片）实现环状数据结构
 // 其中e为具体对象，非指针，这样可以一次性进行内存申请
-type ringBuffer[T any] struct {
+type ringBuffer struct {
 	// 增加默认的对象以便于return，处理data race问题
-	tDefault T
-	buf      []e[T]
+	tDefault struct{}
+	buf      []e
 	capMask  uint64
 }
 
-func newRingBuffer[T any](cap int) *ringBuffer[T] {
-	x := ringBuffer[T]{
+func newRingBuffer(cap int) *ringBuffer {
+	x := ringBuffer{
 		capMask: uint64(cap) - 1,
-		buf:     make([]e[T], cap),
+		buf:     make([]e, cap),
 	}
 	return &x
 }
 
-func (r *ringBuffer[T]) write(c uint64, v T) {
+func (r *ringBuffer) write(c uint64, v interface{}) {
 	x := &r.buf[c&r.capMask]
 	x.val = v
 	atomic.StoreUint64(&x.c, c+1)
 }
 
-func (r *ringBuffer[T]) element(c uint64) e[T] {
+func (r *ringBuffer) element(c uint64) interface{} {
 	return r.buf[c&r.capMask]
 }
 
-func (r *ringBuffer[T]) contains(c uint64) (T, bool) {
+func (r *ringBuffer) contains(c uint64) (interface{}, bool) {
 	x := &r.buf[c&r.capMask]
 	if atomic.LoadUint64(&x.c) == c+1 {
 		v := x.val
@@ -50,6 +50,6 @@ func (r *ringBuffer[T]) contains(c uint64) (T, bool) {
 	return r.tDefault, false
 }
 
-func (r *ringBuffer[T]) cap() uint64 {
+func (r *ringBuffer) cap() uint64 {
 	return r.capMask + 1
 }

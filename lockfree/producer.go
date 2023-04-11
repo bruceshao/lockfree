@@ -15,16 +15,16 @@ import (
 
 // Producer 生产者
 // 核心方法是Write，通过调用Write方法可以将对象写入到队列中
-type Producer[T any] struct {
+type Producer struct {
 	seqer    *sequencer
-	rbuf     *ringBuffer[T]
+	rbuf     *ringBuffer
 	blocks   blockStrategy
 	capacity uint64
 	status   int32
 }
 
-func newProducer[T any](seqer *sequencer, rbuf *ringBuffer[T], blocks blockStrategy) *Producer[T] {
-	return &Producer[T]{
+func newProducer(seqer *sequencer, rbuf *ringBuffer, blocks blockStrategy) *Producer {
+	return &Producer{
 		seqer:    seqer,
 		rbuf:     rbuf,
 		blocks:   blocks,
@@ -33,7 +33,7 @@ func newProducer[T any](seqer *sequencer, rbuf *ringBuffer[T], blocks blockStrat
 	}
 }
 
-func (q *Producer[T]) start() error {
+func (q *Producer) start() error {
 	if atomic.CompareAndSwapInt32(&q.status, READY, RUNNING) {
 		return nil
 	}
@@ -47,7 +47,7 @@ func (q *Producer[T]) start() error {
 // 如果无法写入则持续循环等待，直到可以写入为止，此处基于一种思想即写入的实时性，写入操作不需要等太久，因此此处是没有阻塞的，
 // 仅仅通过调度让出的方式，进行一部分cpu让渡，防止持续占用cpu资源
 // 获取到写入资格后将内容写入到ringbuffer，同时更新available数组，并且调用release，以便于释放消费端的阻塞等待
-func (q *Producer[T]) Write(v T) error {
+func (q *Producer) Write(v interface{}) error {
 	if q.closed() {
 		return ClosedError
 	}
@@ -70,13 +70,13 @@ func (q *Producer[T]) Write(v T) error {
 	}
 }
 
-func (q *Producer[T]) close() error {
+func (q *Producer) close() error {
 	if atomic.CompareAndSwapInt32(&q.status, RUNNING, READY) {
 		return nil
 	}
 	return fmt.Errorf(CloseErrorFormat, "Producer")
 }
 
-func (q *Producer[T]) closed() bool {
+func (q *Producer) closed() bool {
 	return q.status == READY
 }

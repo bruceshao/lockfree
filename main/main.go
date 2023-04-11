@@ -86,9 +86,9 @@ func lockfreeMain() {
 		slower      = uint64(0)
 	)
 	// 创建事件处理器
-	eh := &longEventHandler[uint64]{}
+	eh := &longEventHandler{}
 	// 创建消费端串行处理的Lockfree
-	lf := lockfree.NewLockfree[uint64](cap, eh, lockfree.NewSleepBlockStrategy(time.Millisecond))
+	lf := lockfree.NewLockfree(cap, eh, lockfree.NewSleepBlockStrategy(time.Millisecond))
 	// 启动Lockfree
 	if err := lf.Start(); err != nil {
 		panic(err)
@@ -240,11 +240,12 @@ func chanMain() {
 	}
 }
 
-type longEventHandler[T uint64] struct {
+type longEventHandler struct {
 }
 
-func (h *longEventHandler[T]) OnEvent(v uint64) {
-	if v%10000000 == 0 {
+func (h *longEventHandler) OnEvent(v interface{}) {
+	x := v.(uint64)
+	if x%10000000 == 0 {
 		fmt.Println("lockfree [", v, "]")
 	}
 }
