@@ -23,10 +23,10 @@ type consumer[T any] struct {
 	hdl    EventHandler[T]
 }
 
-func newConsumer[T any](rbuf *ringBuffer[T], hdl EventHandler[T], blocks blockStrategy) *consumer[T] {
+func newConsumer[T any](rbuf *ringBuffer[T], hdl EventHandler[T], sequer *sequencer, blocks blockStrategy) *consumer[T] {
 	return &consumer[T]{
 		rbuf:   rbuf,
-		seqer:  rbuf.sequer,
+		seqer:  sequer,
 		hdl:    hdl,
 		blocks: blocks,
 		status: READY,
@@ -54,11 +54,7 @@ func (c *consumer[T]) handle() {
 				return
 			}
 			// 看下读取位置的seq是否OK
-			x := c.rbuf.element(rc - 1)
-			if x.c == rc {
-				// 表明内容写入成功
-				v := x.val
-				// 设置read自增
+			if v, exist := c.rbuf.contains(rc - 1); exist {
 				rc = c.seqer.readIncrement()
 				c.hdl.OnEvent(v)
 				i = 0

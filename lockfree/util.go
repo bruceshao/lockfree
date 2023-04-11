@@ -61,3 +61,18 @@ func byteArrayPointerWithInt64(capacity int) unsafe.Pointer {
 	rs := (*reflect.SliceHeader)(unsafe.Pointer(&bytes))
 	return unsafe.Pointer(rs.Data)
 }
+
+// minSuitableCap 最小的合适的数量
+func minSuitableCap(v int) int {
+	if v <= 0 {
+		return 2
+	}
+	v--
+	v |= v >> 1
+	v |= v >> 2
+	v |= v >> 4
+	v |= v >> 8
+	v |= v >> 16
+	v++
+	return v
+}

@@ -55,3 +55,16 @@ func TestMM(t *testing.T) {
 	i = 0
 	time.Sleep(10 * time.Microsecond)
 }
+
+func TestMinSuitableCap(t *testing.T) {
+	x := minSuitableCap(-1)
+	fmt.Println(x)
+	x = minSuitableCap(3)
+	fmt.Println(x)
+	x = minSuitableCap(10)
+	fmt.Println(x)
+	x = minSuitableCap(1023)
+	fmt.Println(x)
+	x = minSuitableCap(16)
+	fmt.Println(x)
+}
