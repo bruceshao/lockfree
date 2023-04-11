@@ -47,3 +47,18 @@ func TestX(t *testing.T) {
 	tl := time.Since(ts)
 	fmt.Println(tl.Microseconds())
 }
+
+func TestBuffer(t *testing.T) {
+	buf := newRingBuffer[uint64](1024, nil)
+	buf.write(0, 1)
+	x := buf.element(0)
+	fmt.Println(x)
+
+	buf.write(1023, 2)
+	x = buf.element(1023)
+	fmt.Println(x)
+
+	buf.write(1024, 3)
+	x = buf.element(1024)
+	fmt.Println(x)
+}

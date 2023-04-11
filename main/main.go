@@ -19,6 +19,7 @@ import (
 var (
 	goSize    = 10000
 	sizePerGo = 10000
+	counter   = uint64(0)
 )
 
 func main() {
@@ -32,8 +33,8 @@ func main() {
 	// 创建事件处理器
 	eh := &longEventHandler[uint64]{}
 	// 创建消费端串行处理的Lockfree
-	lf := lockfree.NewLockfree[uint64](1024*1024, lockfree.Array, eh,
-		lockfree.NewSleepBlockStrategy(time.Microsecond))
+	lf := lockfree.NewLockfree[uint64](1024*1024, eh,
+		lockfree.NewSleepBlockStrategy(1*time.Millisecond))
 	// 启动Lockfree
 	if err := lf.Start(); err != nil {
 		panic(err)
@@ -46,7 +47,13 @@ func main() {
 		go func(start int) {
 			for j := 0; j < sizePerGo; j++ {
 				//写入数据
+				//x := atomic.AddUint64(&counter, 1)
 				err := producer.Write(uint64(start*sizePerGo + j + 1))
+				//err := producer.Write(x)
+				//fmt.Println("write[", x, "]")
+				//if x%10000000 == 0 {
+				//	fmt.Println("write[", x, "]")
+				//}
 				if err != nil {
 					panic(err)
 				}
@@ -66,6 +73,7 @@ type longEventHandler[T uint64] struct {
 }
 
 func (h *longEventHandler[T]) OnEvent(v uint64) {
+	//fmt.Println("lockfree [", v, "]")
 	if v%10000000 == 0 {
 		fmt.Println("lockfree [", v, "]")
 	}

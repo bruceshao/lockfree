@@ -57,7 +57,7 @@ func TestAA(t *testing.T) {
 	//queue, err := NewProducer[uint64](1024*1024, 1, eh, &SleepWaitStrategy{
 	//	t: time.Nanosecond * 1,
 	//})
-	disruptor := NewLockfree[uint64](1024*1024*128, Uint8Array, eh,
+	disruptor := NewLockfree[uint64](1024*1024*128, eh,
 		NewSleepBlockStrategy(time.Microsecond))
 	disruptor.Start()
 	producer := disruptor.Producer()

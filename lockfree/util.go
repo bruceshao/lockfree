@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	active_spin      = 4
-	passive_spin     = 1
+	activeSpin       = 4
+	passiveSpin      = 2
 	READY            = 0 // 模块的状态之就绪态
 	RUNNING          = 1 // 模块的状态之运行态
 	StartErrorFormat = "start model [%s] error"
@@ -31,7 +31,7 @@ var (
 
 func init() {
 	if ncpu > 1 {
-		spin = active_spin
+		spin = activeSpin
 	}
 }
 

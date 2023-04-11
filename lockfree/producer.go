@@ -9,28 +9,27 @@ package lockfree
 
 import (
 	"fmt"
+	"runtime"
 	"sync/atomic"
 )
 
 // Producer 生产者
 // 核心方法是Write，通过调用Write方法可以将对象写入到队列中
 type Producer[T any] struct {
-	seqer  *sequencer
-	rbuf   *ringBuffer[T]
-	sd     stateDescriptor
-	blocks blockStrategy
-	mask   uint64
-	status int32
+	seqer    *sequencer
+	rbuf     *ringBuffer[T]
+	blocks   blockStrategy
+	capacity uint64
+	status   int32
 }
 
-func newProducer[T any](seqer *sequencer, sd stateDescriptor, rbuf *ringBuffer[T], blocks blockStrategy) *Producer[T] {
+func newProducer[T any](seqer *sequencer, rbuf *ringBuffer[T], blocks blockStrategy) *Producer[T] {
 	return &Producer[T]{
-		seqer:  seqer,
-		rbuf:   rbuf,
-		sd:     sd,
-		blocks: blocks,
-		mask:   uint64(rbuf.capacity) - 1,
-		status: READY,
+		seqer:    seqer,
+		rbuf:     rbuf,
+		blocks:   blocks,
+		capacity: rbuf.cap(),
+		status:   READY,
 	}
 }
 
@@ -52,24 +51,23 @@ func (q *Producer[T]) Write(v T) error {
 	if q.closed() {
 		return ClosedError
 	}
-	seq := q.seqer.next()
-	pos := int(seq & q.mask)
+	next := q.seqer.wc.increment()
 	for {
-		if q.sd.disabled(pos) {
-			q.rbuf.write(pos, v)
-			q.sd.enable(pos)
+		// 判断是否可以写入
+		r := atomic.LoadUint64(&q.seqer.rc) - 1
+		if next <= r+q.capacity {
+			// 可以写入数据，将数据写入到指定位置
+			q.rbuf.write(next-1, v)
 			// 释放，防止消费端阻塞
 			q.blocks.release()
-			break
+			return nil
 		}
-		// 写操作持续等待
-		procyield(30)
+		runtime.Gosched()
 		// 再次判断是否已关闭
 		if q.closed() {
 			return ClosedError
 		}
 	}
-	return nil
 }
 
 func (q *Producer[T]) close() error {
