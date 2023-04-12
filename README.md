@@ -170,40 +170,58 @@ RingBuffer的容量为2的n次方，通过与运算来代替取余运算，提�
 
 #### 3.2. 代码调用
 为了提升性能，Lockfree支持go版本1.18及以上，以便于支持泛型，Lockfree使用非常简单：
+
 ```go
+package main
+
 import (
 	"fmt"
-	"github.com/bruceshao/lockfree/lockfree"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/bruceshao/lockfree/lockfree"
 )
 
 var (
 	goSize    = 10000
 	sizePerGo = 10000
+
+	total = goSize * sizePerGo
 )
 
 func main() {
-	// lockfree计时 
-	t := time.Now()
-    // 创建事件处理器
-    eh := &longEventHandler[uint64]{}
-    // 创建消费端串行处理的Lockfree
-    lf := lockfree.NewLockfree[uint64](1024*1024, eh,
-		lockfree.NewSleepBlockStrategy(time.Millisecond))
-    // 启动Lockfree
-    if err := lf.Start(); err != nil {
+	// lockfree计时
+	now := time.Now()
+
+	// 创建事件处理器
+	handler := &eventHandler[uint64]{
+		signal: make(chan struct{}, 0),
+		now:    now,
+	}
+
+	// 创建消费端串行处理的Lockfree
+	lf := lockfree.NewLockfree[uint64](
+		1024*1024,
+		handler,
+		lockfree.NewSleepBlockStrategy(time.Millisecond),
+	)
+
+	// 启动Lockfree
+	if err := lf.Start(); err != nil {
 		panic(err)
 	}
-    // 获取生产者对象
-    producer := lf.Producer()
-    var wg sync.WaitGroup
-    wg.Add(goSize)
-    for i := 0; i < goSize; i++ {
-        go func(start int) {
+
+	// 获取生产者对象
+	producer := lf.Producer()
+
+	// 并发写入
+	var wg sync.WaitGroup
+	wg.Add(goSize)
+	for i := 0; i < goSize; i++ {
+		go func(start int) {
 			for j := 0; j < sizePerGo; j++ {
-                //写入数据
-                err := producer.Write(uint64(start*sizePerGo + j + 1))
+				err := producer.Write(uint64(start*sizePerGo + j + 1))
 				if err != nil {
 					panic(err)
 				}
@@ -211,23 +229,41 @@ func main() {
 			wg.Done()
 		}(i)
 	}
+
+	// wait for producer
 	wg.Wait()
-    fmt.Println("=====lockfree[", time.Now().Sub(t), "]=====")
-    fmt.Println("----- lockfree write complete -----")
-    time.Sleep(1 * time.Second)
-    // 关闭Lockfree
-    lf.Close()
+
+	fmt.Printf("producer has been writed, write count: %v, time cost: %v \n", total, time.Since(now).String())
+
+	// wait for consumer
+	handler.wait()
+
+	// 关闭Lockfree
+	lf.Close()
 }
 
-type longEventHandler[T uint64] struct {
+type eventHandler[T uint64] struct {
+	signal   chan struct{}
+	gcounter uint64
+	now      time.Time
 }
 
-func (h *longEventHandler[T]) OnEvent(v uint64) {
-	if v%10000000 == 0 {
-		fmt.Println("lockfree [", v, "]")
+func (h *eventHandler[T]) OnEvent(v uint64) {
+	cur := atomic.AddUint64(&h.gcounter, 1)
+	if cur == uint64(total) {
+		fmt.Printf("eventHandler has been consumed already, read count: %v, time cose: %v\n", total, time.Since(h.now))
+		close(h.signal)
+		return
+	}
+
+	if cur%10000000 == 0 {
+		fmt.Printf("eventHandler consume %v\n", cur)
 	}
 }
 
+func (h *eventHandler[T]) wait() {
+	<-h.signal
+}
 ```
 
 ### 4. 性能对比
