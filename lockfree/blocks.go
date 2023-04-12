@@ -9,6 +9,7 @@ package lockfree
 
 import (
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -114,4 +115,25 @@ func (s *ChanBlockStrategy) release() {
 	}
 	// 无法设置则不用关心
 	return
+}
+
+// ConditionBlockStrategy condition 阻塞策略
+type ConditionBlockStrategy struct {
+	cond *sync.Cond
+}
+
+func NewConditionBlockStrategy() *ConditionBlockStrategy {
+	return &ConditionBlockStrategy{
+		cond: sync.NewCond(&sync.Mutex{}),
+	}
+}
+
+func (s *ConditionBlockStrategy) block() {
+	s.cond.L.Lock()
+	s.cond.Wait()
+	s.cond.L.Unlock()
+}
+
+func (s *ConditionBlockStrategy) release() {
+	s.cond.Broadcast()
 }
