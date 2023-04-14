@@ -21,6 +21,9 @@ type blockStrategy interface {
 
 	// release 释放阻塞
 	release()
+
+	// close 防止资源泄露
+	close()
 }
 
 // SchedBlockStrategy 调度等待策略
@@ -33,6 +36,9 @@ func (s *SchedBlockStrategy) block() {
 }
 
 func (s *SchedBlockStrategy) release() {
+}
+
+func (s *SchedBlockStrategy) close() {
 }
 
 // SleepBlockStrategy 休眠等待策略
@@ -54,6 +60,9 @@ func (s *SleepBlockStrategy) block() {
 func (s *SleepBlockStrategy) release() {
 }
 
+func (s *SleepBlockStrategy) close() {
+}
+
 // ProcYieldBlockStrategy CPU空指令策略
 type ProcYieldBlockStrategy struct {
 	cycle uint32
@@ -72,6 +81,9 @@ func (s *ProcYieldBlockStrategy) block() {
 func (s *ProcYieldBlockStrategy) release() {
 }
 
+func (s *ProcYieldBlockStrategy) close() {
+}
+
 // OSYieldBlockStrategy 操作系统调度策略
 type OSYieldBlockStrategy struct {
 }
@@ -85,6 +97,9 @@ func (s *OSYieldBlockStrategy) block() {
 }
 
 func (s *OSYieldBlockStrategy) release() {
+}
+
+func (s *OSYieldBlockStrategy) close() {
 }
 
 // ChanBlockStrategy chan阻塞策略
@@ -117,6 +132,10 @@ func (s *ChanBlockStrategy) release() {
 	return
 }
 
+func (s *ChanBlockStrategy) close() {
+	close(s.bc)
+}
+
 // ConditionBlockStrategy condition 阻塞策略
 type ConditionBlockStrategy struct {
 	cond *sync.Cond
@@ -136,4 +155,7 @@ func (s *ConditionBlockStrategy) block() {
 
 func (s *ConditionBlockStrategy) release() {
 	s.cond.Broadcast()
+}
+
+func (s *ConditionBlockStrategy) close() {
 }

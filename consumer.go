@@ -77,6 +77,8 @@ func (c *consumer[T]) close() error {
 	if atomic.CompareAndSwapInt32(&c.status, RUNNING, READY) {
 		// 防止阻塞无法释放
 		c.blocks.release()
+		// 防止资源泄露
+		c.blocks.close()
 		return nil
 	}
 	return fmt.Errorf(CloseErrorFormat, "Consumer")
