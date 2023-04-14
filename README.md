@@ -180,7 +180,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/bruceshao/lockfree/lockfree"
+	"github.com/bruceshao/lockfree"
 )
 
 var (

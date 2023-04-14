@@ -9,7 +9,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/bruceshao/lockfree/lockfree"
+	"github.com/bruceshao/lockfree"
 	"os"
 	"runtime/pprof"
 	"sync"
