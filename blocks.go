@@ -24,7 +24,7 @@ type blockStrategy interface {
 }
 
 // SchedBlockStrategy 调度等待策略
-// 调用runtime.Gosched()方法将当前g让渡出去
+// 调用runtime.Gosched()方法使当前 g 主动让出 cpu 资源。
 type SchedBlockStrategy struct {
 }
 
@@ -36,7 +36,11 @@ func (s *SchedBlockStrategy) release() {
 }
 
 // SleepBlockStrategy 休眠等待策略
-// 调用Sleep方法将当前g让渡出去
+// 调用 Sleep 方法使当前 g 主动让出 cpu 资源。
+// sleep poll 参考值:
+// 轮询时长为 10us 时，cpu 开销约 2-3% 左右。
+// 轮询时长为 5us 时，cpu 开销约在 10% 左右。
+// 轮询时长小于 5us 时，cpu 开销接近 100% 满载。
 type SleepBlockStrategy struct {
 	t time.Duration
 }
