@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync/atomic"
+	"time"
 )
 
 // Producer 生产者
@@ -48,10 +49,21 @@ func (q *Producer[T]) start() error {
 // 仅仅通过调度让出的方式，进行一部分cpu让渡，防止持续占用cpu资源
 // 获取到写入资格后将内容写入到ringbuffer，同时更新available数组，并且调用release，以便于释放消费端的阻塞等待
 func (q *Producer[T]) Write(v T) error {
+	return q.write(v, 0)
+}
+
+// WriteSleep 当 ringbuffer 已满时，先 cpu pause 则 sched 让出资源，最后进行 sleep 休眠，以此避免频繁 spin 引发的 cpu 开销。
+func (q *Producer[T]) WriteSleep(v T, dur time.Duration) error {
+	return q.write(v, dur)
+}
+
+func (q *Producer[T]) write(v T, dur time.Duration) error {
 	if q.closed() {
 		return ClosedError
 	}
+
 	next := q.seqer.wc.increment()
+	var i = 0
 	for {
 		// 判断是否可以写入
 		r := atomic.LoadUint64(&q.seqer.rc) - 1
@@ -62,7 +74,19 @@ func (q *Producer[T]) Write(v T) error {
 			q.blocks.release()
 			return nil
 		}
-		runtime.Gosched()
+
+		if i < spin {
+			procyield(30)
+		} else if i < spin+passiveSpin {
+			runtime.Gosched()
+		} else {
+			time.Sleep(dur) // the time.sleep method ignore the case of duration 0.
+
+			// reset
+			i = 0
+		}
+		i++
+
 		// 再次判断是否已关闭
 		if q.closed() {
 			return ClosedError
