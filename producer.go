@@ -63,6 +63,8 @@ func (q *Producer[T]) Write(v T) error {
 			return nil
 		}
 		runtime.Gosched()
+                // 防止消费端无限阻塞
+                q.blocks.release()
 		// 再次判断是否已关闭
 		if q.closed() {
 			return ClosedError
