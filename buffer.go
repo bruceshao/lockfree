@@ -41,13 +41,13 @@ func (r *ringBuffer[T]) element(c uint64) e[T] {
 	return r.buf[c&r.capMask]
 }
 
-func (r *ringBuffer[T]) contains(c uint64) (T, bool) {
+func (r *ringBuffer[T]) contains(c uint64) (T, *uint64, bool) {
 	x := &r.buf[c&r.capMask]
 	if atomic.LoadUint64(&x.c) == c+1 {
 		v := x.val
-		return v, true
+		return v, &x.c, true
 	}
-	return r.tDefault, false
+	return r.tDefault, &x.c, false
 }
 
 func (r *ringBuffer[T]) cap() uint64 {

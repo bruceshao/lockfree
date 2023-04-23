@@ -54,21 +54,22 @@ func (c *consumer[T]) handle() {
 				return
 			}
 			// 看下读取位置的seq是否OK
-			if v, exist := c.rbuf.contains(rc - 1); exist {
+			if v, p, exist := c.rbuf.contains(rc - 1); exist {
 				rc = c.seqer.readIncrement()
 				c.hdl.OnEvent(v)
 				i = 0
 				break
-			}
-			if i < spin {
-				procyield(30)
-			} else if i < spin+passiveSpin {
-				runtime.Gosched()
 			} else {
-				c.blocks.block()
-				i = 0
+				if i < spin {
+					procyield(30)
+				} else if i < spin+passiveSpin {
+					runtime.Gosched()
+				} else {
+					c.blocks.block(p, rc)
+					i = 0
+				}
+				i++
 			}
-			i++
 		}
 	}
 }

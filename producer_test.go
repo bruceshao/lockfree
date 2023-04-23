@@ -33,6 +33,7 @@ func (h *longEventHandler[T]) OnEvent(v uint64) {
 	if h.count == 1 {
 		h.ts = time.Now()
 	}
+	fmt.Println("consumer ", v)
 	//if v%1000000 == 0 {
 	//	fmt.Printf("read %d\n", v)
 	//}
