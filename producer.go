@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync/atomic"
+	"time"
 )
 
 // Producer 生产者
@@ -68,6 +69,62 @@ func (q *Producer[T]) Write(v T) error {
 			return ClosedError
 		}
 	}
+}
+
+// WriteTimeout 在写入的基础上设定一个时间，如果时间到了仍然没有写入则会放弃本次写入，返回写入的位置和false
+// 使用方需要调用 WriteByCursor 来继续写入该位置，因为位置已经被占用，是必须要写的，不能跳跃性写入
+// 在指定时间内写入成功会返回true
+// 三个返回项：写入位置、是否写入成功及是否有error
+func (q *Producer[T]) WriteTimeout(v T, timeout time.Duration) (uint64, bool, error) {
+	if q.closed() {
+		return 0, false, ClosedError
+	}
+	next := q.seqer.wc.increment()
+	// 创建定时器
+	waiter := time.NewTimer(timeout)
+	for {
+		select {
+		case <-waiter.C:
+			// 超时触发，执行到此处表示未写入，返回对应结果即可
+			return next, false, nil
+		default:
+			// 判断是否可以写入
+			r := atomic.LoadUint64(&q.seqer.rc) - 1
+			if next <= r+q.capacity {
+				// 可以写入数据，将数据写入到指定位置
+				q.rbuf.write(next-1, v)
+				// 释放，防止消费端阻塞
+				q.blocks.release()
+				// 返回写入成功标识
+				return next, true, nil
+			}
+			runtime.Gosched()
+		}
+		// 再次判断是否已关闭
+		if q.closed() {
+			return 0, false, ClosedError
+		}
+	}
+}
+
+// WriteByCursor 根据游标写入内容，wc是调用 WriteTimeout 方法返回false时对应的写入位置，
+// 该位置有严格的含义，不要随意填值，否则会造成整个队列异常
+// 函数返回值：是否写入成功和是否存在error，若返回false表示写入失败，可以继续调用重复写入
+func (q *Producer[T]) WriteByCursor(v T, wc uint64) (bool, error) {
+	if q.closed() {
+		return false, ClosedError
+	}
+	// 判断是否可以写入
+	r := atomic.LoadUint64(&q.seqer.rc) - 1
+	if wc <= r+q.capacity {
+		// 可以写入数据，将数据写入到指定位置
+		q.rbuf.write(wc-1, v)
+		// 释放，防止消费端阻塞
+		q.blocks.release()
+		// 返回写入成功标识
+		return true, nil
+	}
+	return false, nil
 }
 
 func (q *Producer[T]) close() error {
