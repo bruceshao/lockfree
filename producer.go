@@ -102,7 +102,6 @@ func (q *Producer[T]) WriteTimeout(v T, timeout time.Duration) (uint64, bool, er
 			// 释放，防止消费端阻塞
 			q.blocks.release()
 			// 返回写入成功标识
-			// return next, true, nil
 			return true
 		}
 
