@@ -93,25 +93,13 @@ func (q *Producer[T]) WriteTimeout(v T, timeout time.Duration) (uint64, bool, er
 	}
 	next := q.seqer.wc.increment()
 
-	write := func() bool {
-		// 判断是否可以写入
-		r := atomic.LoadUint64(&q.seqer.rc) - 1
-		if next <= r+q.capacity {
-			// 可以写入数据，将数据写入到指定位置
-			q.rbuf.write(next-1, v)
-			// 释放，防止消费端阻塞
-			q.blocks.release()
-			// 返回写入成功标识
-			return true
-		}
-
-		return false
-	}
-
 	// 先尝试写数据 (failfast)
-	ok := write()
+	ok, err := q.WriteByCursor(v, next)
 	if ok {
 		return next, true, nil
+	}
+	if err != nil {
+		return 0, false, err
 	}
 
 	// 创建定时器
@@ -124,16 +112,14 @@ func (q *Producer[T]) WriteTimeout(v T, timeout time.Duration) (uint64, bool, er
 			// 超时触发，执行到此处表示未写入，返回对应结果即可
 			return next, false, nil
 		default:
-			ok := write()
+			ok, err := q.WriteByCursor(v, next)
 			if ok {
 				return next, true, nil
 			}
+			if err != nil {
+				return 0, false, err
+			}
 			runtime.Gosched()
-		}
-
-		// 再次判断是否已关闭
-		if q.closed() {
-			return 0, false, ClosedError
 		}
 	}
 }
