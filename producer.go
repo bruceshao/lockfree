@@ -94,12 +94,9 @@ func (q *Producer[T]) WriteTimeout(v T, timeout time.Duration) (uint64, bool, er
 	next := q.seqer.wc.increment()
 
 	// 先尝试写数据 (failfast)
-	ok, err := q.WriteByCursor(v, next)
+	ok := q.writeByCursor(v, next)
 	if ok {
 		return next, true, nil
-	}
-	if err != nil {
-		return 0, false, err
 	}
 
 	// 创建定时器
@@ -112,14 +109,15 @@ func (q *Producer[T]) WriteTimeout(v T, timeout time.Duration) (uint64, bool, er
 			// 超时触发，执行到此处表示未写入，返回对应结果即可
 			return next, false, nil
 		default:
-			ok, err := q.WriteByCursor(v, next)
+			ok = q.writeByCursor(v, next)
 			if ok {
 				return next, true, nil
 			}
-			if err != nil {
-				return 0, false, err
-			}
 			runtime.Gosched()
+		}
+
+		if q.closed() {
+			return 0, false, ClosedError
 		}
 	}
 }
@@ -131,6 +129,11 @@ func (q *Producer[T]) WriteByCursor(v T, wc uint64) (bool, error) {
 	if q.closed() {
 		return false, ClosedError
 	}
+
+	return q.writeByCursor(v, wc), nil
+}
+
+func (q *Producer[T]) writeByCursor(v T, wc uint64) bool {
 	// 判断是否可以写入
 	r := atomic.LoadUint64(&q.seqer.rc) - 1
 	if wc <= r+q.capacity {
@@ -139,9 +142,9 @@ func (q *Producer[T]) WriteByCursor(v T, wc uint64) (bool, error) {
 		// 释放，防止消费端阻塞
 		q.blocks.release()
 		// 返回写入成功标识
-		return true, nil
+		return true
 	}
-	return false, nil
+	return false
 }
 
 func (q *Producer[T]) close() error {
