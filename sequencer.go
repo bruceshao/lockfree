@@ -14,9 +14,9 @@ import (
 // sequencer 序号产生器，维护读和写两个状态，写状态具体由内部游标（cursor）维护。
 // 读取状态由自身维护，变量read即可
 type sequencer struct {
-	wc       *cursor
 	rc       uint64 // 读取游标，因为该值仅会被一个g修改，所以不需要使用cursor
 	capacity uint64
+	wc       *cursor
 }
 
 func newSequencer(capacity int) *sequencer {
