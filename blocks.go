@@ -17,7 +17,7 @@ import (
 // blockStrategy 阻塞策略
 type blockStrategy interface {
 	// block 阻塞
-	block(actual *uint64, expected uint64)
+	block(actual *atomic.Uint64, expected uint64)
 
 	// release 释放阻塞
 	release()
@@ -28,7 +28,7 @@ type blockStrategy interface {
 type SchedBlockStrategy struct {
 }
 
-func (s *SchedBlockStrategy) block(actual *uint64, expected uint64) {
+func (s *SchedBlockStrategy) block(actual *atomic.Uint64, expected uint64) {
 	runtime.Gosched()
 }
 
@@ -51,7 +51,7 @@ func NewSleepBlockStrategy(wait time.Duration) *SleepBlockStrategy {
 	}
 }
 
-func (s *SleepBlockStrategy) block(actual *uint64, expected uint64) {
+func (s *SleepBlockStrategy) block(actual *atomic.Uint64, expected uint64) {
 	time.Sleep(s.t)
 }
 
@@ -69,7 +69,7 @@ func NewProcYieldBlockStrategy(cycle uint32) *ProcYieldBlockStrategy {
 	}
 }
 
-func (s *ProcYieldBlockStrategy) block(actual *uint64, expected uint64) {
+func (s *ProcYieldBlockStrategy) block(actual *atomic.Uint64, expected uint64) {
 	procyield(s.cycle)
 }
 
@@ -84,7 +84,7 @@ func NewOSYieldWaitStrategy() *OSYieldBlockStrategy {
 	return &OSYieldBlockStrategy{}
 }
 
-func (s *OSYieldBlockStrategy) block(actual *uint64, expected uint64) {
+func (s *OSYieldBlockStrategy) block(actual *atomic.Uint64, expected uint64) {
 	osyield()
 }
 
@@ -103,11 +103,11 @@ func NewChanBlockStrategy() *ChanBlockStrategy {
 	}
 }
 
-func (s *ChanBlockStrategy) block(actual *uint64, expected uint64) {
+func (s *ChanBlockStrategy) block(actual *atomic.Uint64, expected uint64) {
 	// 0：未阻塞；1：阻塞
 	if atomic.CompareAndSwapUint32(&s.b, 0, 1) {
 		// 设置成功的话，表示阻塞，需要进行二次判断
-		if atomic.LoadUint64(actual) == expected {
+		if actual.Load() == expected {
 			// 表示阻塞失败，因为结果是一致的，此处需要重新将状态调整回来
 			if atomic.CompareAndSwapUint32(&s.b, 1, 0) {
 				// 表示回调成功，直接退出即可
@@ -144,10 +144,10 @@ func NewConditionBlockStrategy() *ConditionBlockStrategy {
 	}
 }
 
-func (s *ConditionBlockStrategy) block(actual *uint64, expected uint64) {
+func (s *ConditionBlockStrategy) block(actual *atomic.Uint64, expected uint64) {
 	s.cond.L.Lock()
 	defer s.cond.L.Unlock()
-	if atomic.LoadUint64(actual) == expected {
+	if actual.Load() == expected {
 		return
 	}
 	s.cond.Wait()
