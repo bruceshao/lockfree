@@ -37,8 +37,8 @@ func (r *ringBuffer[T]) write(c uint64, v T) {
 	x.c.Store(c+1)
 }
 
-func (r *ringBuffer[T]) element(c uint64) e[T] {
-	return r.buf[c&r.capMask]
+func (r *ringBuffer[T]) element(c uint64) *e[T] {
+	return &r.buf[c&r.capMask]
 }
 
 func (r *ringBuffer[T]) contains(c uint64) (T, *atomic.Uint64, bool) {
