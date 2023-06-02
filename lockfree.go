@@ -21,6 +21,7 @@ type Lockfree[T any] struct {
 
 // NewLockfree 自定义创建消费端的Disruptor
 // capacity：buffer的容量大小，类似于chan的大小，但要求必须是2^n，即2的指数倍，如果不是的话会被修改
+// batch: 如果batch值大于1，表示启用批处理模式，消费端会一次处理尽可能多的数据，最多batch个数据
 // handler：消费端的事件处理器
 // blocks：读取阻塞时的处理策略
 func NewLockfree[T any](capacity, batch int, handler EventHandler[T], blocks blockStrategy) *Lockfree[T] {
