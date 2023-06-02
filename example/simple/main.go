@@ -36,6 +36,7 @@ func main() {
 	// 创建消费端串行处理的Lockfree
 	lf := lockfree.NewLockfree[uint64](
 		1024*1024,
+		0,
 		handler,
 		lockfree.NewSleepBlockStrategy(time.Millisecond),
 	)
@@ -91,6 +92,12 @@ func (h *eventHandler[T]) OnEvent(v uint64) {
 
 	if cur%10000000 == 0 {
 		fmt.Printf("eventHandler consume %v\n", cur)
+	}
+}
+
+func (h *eventHandler[T]) OnBatchEvent(v []uint64) {
+	for i := range v {
+		h.OnEvent(v[i])
 	}
 }
 

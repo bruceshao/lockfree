@@ -23,12 +23,12 @@ type Lockfree[T any] struct {
 // capacity：buffer的容量大小，类似于chan的大小，但要求必须是2^n，即2的指数倍，如果不是的话会被修改
 // handler：消费端的事件处理器
 // blocks：读取阻塞时的处理策略
-func NewLockfree[T any](capacity int, handler EventHandler[T], blocks blockStrategy) *Lockfree[T] {
+func NewLockfree[T any](capacity, batch int, handler EventHandler[T], blocks blockStrategy) *Lockfree[T] {
 	// 重新计算正确的容量
 	capacity = minSuitableCap(capacity)
 	seqer := newSequencer(capacity)
 	rbuf := newRingBuffer[T](capacity)
-	cmer := newConsumer[T](rbuf, handler, seqer, blocks)
+	cmer := newConsumer[T](batch, rbuf, handler, seqer, blocks)
 	writer := newProducer[T](seqer, rbuf, blocks)
 	return &Lockfree[T]{
 		writer:   writer,

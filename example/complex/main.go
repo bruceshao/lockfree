@@ -31,7 +31,7 @@ func writeByDiscard() {
 	eh := &fixedSleepEventHandler[uint64]{
 		sm: time.Millisecond * 10,
 	}
-	disruptor := lockfree.NewLockfree[uint64](2, eh, lockfree.NewSleepBlockStrategy(time.Microsecond))
+	disruptor := lockfree.NewLockfree[uint64](2, 0, eh, lockfree.NewSleepBlockStrategy(time.Microsecond))
 	disruptor.Start()
 	producer := disruptor.Producer()
 	// 假设有100个写g
@@ -66,7 +66,7 @@ func writeByCursor() {
 	var counter = uint64(0)
 	// 写入超时，如何使用
 	eh := &randomSleepEventHandler[uint64]{}
-	disruptor := lockfree.NewLockfree[uint64](2, eh, lockfree.NewSleepBlockStrategy(time.Microsecond))
+	disruptor := lockfree.NewLockfree[uint64](2, 0, eh, lockfree.NewSleepBlockStrategy(time.Microsecond))
 	disruptor.Start()
 	producer := disruptor.Producer()
 	// 假设有100个写g
@@ -108,7 +108,6 @@ func writeByCursor() {
 	disruptor.Close()
 }
 
-
 type fixedSleepEventHandler[T uint64] struct {
 	sm time.Duration
 }
@@ -116,6 +115,12 @@ type fixedSleepEventHandler[T uint64] struct {
 func (h *fixedSleepEventHandler[T]) OnEvent(v uint64) {
 	time.Sleep(h.sm)
 	fmt.Println("consumer ", v)
+}
+
+func (h *fixedSleepEventHandler[T]) OnBatchEvent(v []uint64) {
+	for i := range v {
+		h.OnEvent(v[i])
+	}
 }
 
 type randomSleepEventHandler[T uint64] struct {
@@ -127,4 +132,10 @@ func (h *randomSleepEventHandler[T]) OnEvent(v uint64) {
 	intn := rand.Intn(1000)
 	time.Sleep(time.Duration(intn * 1000))
 	fmt.Println("consumer count ", atomic.AddInt32(&h.count, 1))
+}
+
+func (h *randomSleepEventHandler[T]) OnBatchEvent(v []uint64) {
+	for i := range v {
+		h.OnEvent(v[i])
+	}
 }

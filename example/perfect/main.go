@@ -21,6 +21,7 @@ var (
 	goSize      = 10000
 	sizePerGo   = 10000
 	cap         = 1024 * 1024
+	batch       = 0
 	timeAnalyse = false
 )
 
@@ -88,7 +89,7 @@ func lockfreeMain() {
 	// 创建事件处理器
 	eh := &longEventHandler[uint64]{}
 	// 创建消费端串行处理的Lockfree
-	lf := lockfree.NewLockfree[uint64](cap, eh, lockfree.NewSleepBlockStrategy(time.Millisecond))
+	lf := lockfree.NewLockfree[uint64](cap, batch, eh, lockfree.NewSleepBlockStrategy(time.Millisecond))
 	// 启动Lockfree
 	if err := lf.Start(); err != nil {
 		panic(err)
@@ -246,5 +247,11 @@ type longEventHandler[T uint64] struct {
 func (h *longEventHandler[T]) OnEvent(v uint64) {
 	if v%10000000 == 0 {
 		fmt.Println("lockfree [", v, "]")
+	}
+}
+
+func (h *longEventHandler[T]) OnBatchEvent(v []uint64) {
+	for i := range v {
+		h.OnEvent(v[i])
 	}
 }

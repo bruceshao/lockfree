@@ -34,7 +34,6 @@ func (h *longEventHandler[T]) OnEvent(v uint64) {
 	if h.count == 1 {
 		h.ts = time.Now()
 	}
-	fmt.Println("consumer ", v)
 	//if v%1000000 == 0 {
 	//	fmt.Printf("read %d\n", v)
 	//}
@@ -42,6 +41,12 @@ func (h *longEventHandler[T]) OnEvent(v uint64) {
 		tl := time.Since(h.ts)
 		fmt.Printf("read time = %d ms\n", tl.Milliseconds())
 	}
+}
+
+func (h *longEventHandler[T]) OnBatchEvent(v []uint64) {
+    for i :=  range v {
+        h.OnEvent(v[i])
+    }
 }
 
 func TestAA(t *testing.T) {
@@ -59,7 +64,7 @@ func TestAA(t *testing.T) {
 	//queue, err := NewProducer[uint64](1024*1024, 1, eh, &SleepWaitStrategy{
 	//	t: time.Nanosecond * 1,
 	//})
-	disruptor := NewLockfree[uint64](1024*1024*128, eh,
+	disruptor := NewLockfree[uint64](1024*1024*128, 0, eh,
 		NewSleepBlockStrategy(time.Microsecond))
 	disruptor.Start()
 	producer := disruptor.Producer()
@@ -130,7 +135,7 @@ func TestProducer_WriteWindow(t *testing.T) {
 	eh := &sleepEventHandler[uint64]{
 		sm: time.Second,
 	}
-	disruptor := NewLockfree[uint64](1, eh,
+	disruptor := NewLockfree[uint64](1, 0, eh,
 		NewSleepBlockStrategy(time.Microsecond))
 	disruptor.Start()
 	producer := disruptor.Producer()
@@ -141,7 +146,7 @@ func TestProducer_WriteWindow(t *testing.T) {
 		ww := producer.WriteWindow()
 		if ww <= 0 {
 			// 表示不能写入，丢弃
-			fmt.Println("discard ", i , " window ", ww)
+			fmt.Println("discard ", i, " window ", ww)
 		} else {
 			// 实际写入
 			producer.Write(uint64(i))
@@ -158,7 +163,7 @@ func TestWriteTimeout(t *testing.T) {
 	var counter = uint64(0)
 	// 写入超时，如何使用
 	eh := &longSleepEventHandler[uint64]{}
-	disruptor := NewLockfree[uint64](2, eh, NewSleepBlockStrategy(time.Microsecond))
+	disruptor := NewLockfree[uint64](2, 0, eh, NewSleepBlockStrategy(time.Microsecond))
 	disruptor.Start()
 	producer := disruptor.Producer()
 	// 假设有10个写g
@@ -200,7 +205,6 @@ func TestWriteTimeout(t *testing.T) {
 	disruptor.Close()
 }
 
-
 // sleepEventHandler 休眠性质的事件处理器
 type sleepEventHandler[T uint64] struct {
 	sm time.Duration
@@ -209,6 +213,12 @@ type sleepEventHandler[T uint64] struct {
 func (h *sleepEventHandler[T]) OnEvent(v uint64) {
 	time.Sleep(h.sm)
 	fmt.Println("consumer ", v)
+}
+
+func (h *sleepEventHandler[T]) OnBatchEvent(v []uint64) {
+    for i := range v {
+        h.OnEvent(v[i])
+    }
 }
 
 type longSleepEventHandler[T uint64] struct {
@@ -220,4 +230,11 @@ func (h *longSleepEventHandler[T]) OnEvent(v uint64) {
 	intn := rand.Intn(1000)
 	time.Sleep(time.Duration(intn * 1000))
 	fmt.Println("consumer count ", atomic.AddInt32(&h.count, 1))
+}
+
+func (h *longSleepEventHandler[T]) OnBatchEvent(v []uint64) {
+    for i := range v {
+        h.OnEvent(v[i])
+    }
+
 }

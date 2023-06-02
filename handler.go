@@ -13,4 +13,6 @@ package lockfree
 type EventHandler[T any] interface {
 	// OnEvent 用户侧实现，事件处理方法
 	OnEvent(t T)
+        // OnBatchEvent 用户测试先，事件批处理方法
+        OnBatchEvent(t []T)
 }
