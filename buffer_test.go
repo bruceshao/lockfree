@@ -49,7 +49,7 @@ func TestX(t *testing.T) {
 }
 
 func TestBuffer(t *testing.T) {
-	buf := newRingBuffer[uint64](1024)
+	buf := newRingBuffer[uint8](1024)
 	buf.write(0, 1)
 	x := buf.element(0)
 	fmt.Println(x)
