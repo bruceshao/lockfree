@@ -54,7 +54,7 @@ func (c *consumer[T]) handle() {
 				return
 			}
 			// 看下读取位置的seq是否OK
-			if v, p, exist := c.rbuf.contains(rc - 1); exist {
+			if v, p, exist := c.rbuf.contains(rc); exist {
 				rc = c.seqer.readIncrement()
 				c.hdl.OnEvent(v)
 				i = 0

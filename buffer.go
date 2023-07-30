@@ -34,7 +34,7 @@ func newRingBuffer[T any](cap int) *ringBuffer[T] {
 func (r *ringBuffer[T]) write(c uint64, v T) {
 	x := &r.buf[c&r.capMask]
 	x.val = v
-	atomic.StoreUint64(&x.c, c+1)
+	atomic.StoreUint64(&x.c, c)
 }
 
 func (r *ringBuffer[T]) element(c uint64) e[T] {
@@ -43,7 +43,7 @@ func (r *ringBuffer[T]) element(c uint64) e[T] {
 
 func (r *ringBuffer[T]) contains(c uint64) (T, *uint64, bool) {
 	x := &r.buf[c&r.capMask]
-	if atomic.LoadUint64(&x.c) == c+1 {
+	if atomic.LoadUint64(&x.c) == c {
 		v := x.val
 		return v, &x.c, true
 	}

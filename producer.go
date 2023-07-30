@@ -58,7 +58,7 @@ func (q *Producer[T]) Write(v T) error {
 		r := atomic.LoadUint64(&q.seqer.rc) - 1
 		if next <= r+q.capacity {
 			// 可以写入数据，将数据写入到指定位置
-			q.rbuf.write(next-1, v)
+			q.rbuf.write(next, v)
 			// 释放，防止消费端阻塞
 			q.blocks.release()
 			return nil
