@@ -9,7 +9,6 @@ package lockfree
 
 import (
 	"sync"
-	"sync/atomic"
 )
 
 type e[T any] struct {
@@ -40,7 +39,7 @@ func (r *ringBuffer[T]) write(c uint64, v T) {
 	x.val = v
 	r.Lock()
 	defer r.Unlock()
-	atomic.StoreUint64(&x.c, c+1)
+	x.c = c + 1
 }
 
 func (r *ringBuffer[T]) element(c uint64) e[T] {
@@ -51,7 +50,7 @@ func (r *ringBuffer[T]) contains(c uint64) (T, *uint64, bool) {
 	x := &r.buf[c&r.capMask]
 	r.RLock()
 	defer r.RUnlock()
-	if atomic.LoadUint64(&x.c) == c+1 {
+	if x.c == c+1 {
 		v := x.val
 		return v, &x.c, true
 	}
