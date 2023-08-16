@@ -1,3 +1,5 @@
+//go:build ignore
+
 /*
  * Copyright (C) THL A29 Limited, a Tencent company. All rights reserved.
  *
