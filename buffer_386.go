@@ -37,10 +37,10 @@ func newRingBuffer[T any](cap int) *ringBuffer[T] {
 }
 
 func (r *ringBuffer[T]) write(c uint64, v T) {
-	x := &r.buf[c&r.capMask]
-	x.val = v
+	x := r.buf[c&r.capMask]
 	r.Lock()
 	defer r.Unlock()
+	x.val = v
 	x.c = c + 1
 }
 
